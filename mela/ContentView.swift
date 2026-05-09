@@ -1,61 +1,52 @@
-//
-//  ContentView.swift
-//  mela
-//
-//  Created by Viktor Luna on 5/9/26.
-//
-
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @State private var selectedDate: Date
+    @State private var dateState: DashboardDateState
+    @State private var entries: [DiaryEntryRow]
+    @State private var dashboard: DashboardSnapshot
+
+    init(entries: [DiaryEntryRow] = DashboardDemoData.entries) {
+        let selectedDate = Date.now
+        _selectedDate = State(initialValue: selectedDate)
+        _dateState = State(initialValue: DashboardDateState.make(for: selectedDate))
+        _entries = State(initialValue: entries)
+        _dashboard = State(initialValue: DashboardSnapshot.make(entries: entries))
+    }
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
+        DashboardView(
+            date: dateState,
+            snapshot: dashboard,
+            onPreviousDay: { moveDate(by: -1) },
+            onNextDay: { moveDate(by: 1) },
+            onDelete: deleteEntry
+        )
+    }
+
+    private func moveDate(by days: Int) {
+        let nextDate =
+            Calendar.current.date(byAdding: .day, value: days, to: selectedDate) ?? selectedDate
+        selectedDate = nextDate
+        dateState = DashboardDateState.make(for: nextDate)
+    }
+
+    private func deleteEntry(id: UUID) {
+        withAnimation(.smooth(duration: 0.22)) {
+            var nextEntries = entries
+            nextEntries.removeAll { $0.id == id }
+            replaceEntries(nextEntries)
         }
     }
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
+    private func replaceEntries(_ nextEntries: [DiaryEntryRow]) {
+        entries = nextEntries
+        dashboard = DashboardSnapshot.make(entries: nextEntries)
     }
 }
 
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
+    }
 }
