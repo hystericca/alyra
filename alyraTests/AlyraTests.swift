@@ -4,7 +4,7 @@ import Testing
 
 struct AlyraTests {
     @Test func dashboardSummaryTotalsDemoEntries() {
-        let summary = DashboardDemoData.summary(from: DashboardDemoData.entries)
+        let summary = Nutrition.summary(from: DashboardDemoData.entries)
 
         #expect(summary.consumed.calories == 1_042)
         #expect(summary.consumed.protein == 103)
@@ -14,7 +14,13 @@ struct AlyraTests {
 
     @Test func calorieProgressClampsAtTarget() {
         let summary = NutritionSummary(
-            consumed: NutritionFacts(calories: 2_640, protein: 0, carbs: 0, fat: 0, fiber: 0),
+            consumed: NutritionFacts(
+                calories: 2_640,
+                protein: 0,
+                carbs: 0,
+                fat: 0,
+                fiber: 0
+            ),
             targets: DailyTargets.standard
         )
 
@@ -22,14 +28,14 @@ struct AlyraTests {
     }
 
     @Test func dashboardSectionsKeepAllMealSlots() {
-        let sections = DashboardDemoData.sections(from: DashboardDemoData.entries)
+        let sections = Nutrition.sections(from: DashboardDemoData.entries)
 
-        #expect(sections.map(\.meal) == MealKind.allCases)
-        #expect(sections.first { $0.meal == .dinner }?.rows.isEmpty == true)
+        #expect(sections.map(\.mealTime) == MealTime.allCases)
+        #expect(sections.first { $0.mealTime == .dinner }?.entries.isEmpty == true)
     }
 
     @Test func dashboardSnapshotPrecomputesRenderState() {
-        let snapshot = DashboardSnapshot.make(
+        let snapshot = DashboardSnapshot.from(
             entries: DashboardDemoData.entries,
             analytics: DashboardDemoData.analytics
         )
@@ -44,9 +50,9 @@ struct AlyraTests {
         #expect(snapshot.macros.tiles.map(\.title) == ["Protein", "Carbs", "Fat"])
         #expect(snapshot.analytics.weightTrend.samples.count == 14)
         #expect(snapshot.analytics.energyBalance.baseline == 0)
-        #expect(snapshot.sections.first { $0.meal == .breakfast }?.totalCaloriesText == "192 kcal")
-        #expect(snapshot.sections.first?.rows.first?.detailText == "170 g - Plain, 2%")
-        #expect(snapshot.sections.first?.rows.first?.iconKind == .yogurt)
+        #expect(snapshot.sections.first { $0.mealTime == .breakfast }?.totalCaloriesText == "192 kcal")
+        #expect(snapshot.sections.first?.entries.first?.detailText == "170 g - Plain, 2%")
+        #expect(snapshot.sections.first?.entries.first?.iconKind == .yogurt)
     }
 
     @Test func balanceGraphsUseZeroBaselineForAllNegativeValues() {

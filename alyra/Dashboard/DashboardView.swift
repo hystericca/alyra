@@ -1,3 +1,10 @@
+//
+//  DashboardView.swift
+//  alyra
+//
+//  Created by Viktor Luna on 5/30/26.
+//
+
 import SwiftUI
 
 enum DateNavigationDirection: Equatable {
@@ -17,7 +24,7 @@ struct DashboardView: View {
     let date: DashboardDateState
     let dateNavigationDirection: DateNavigationDirection
     let snapshot: DashboardSnapshot
-    let bottomContentInset: CGFloat
+    let appTabPadding: CGFloat
     let onPreviousDay: () -> Void
     let onNextDay: () -> Void
     let onDelete: (UUID) -> Void
@@ -46,7 +53,7 @@ struct DashboardView: View {
                 }
                 .padding(AppTheme.Spacing.screen)
                 .padding(.top, 2)
-                .padding(.bottom, bottomContentInset)
+                .padding(.bottom, appTabPadding)
             }
         }
         .foregroundStyle(AppTheme.primaryText)
@@ -77,11 +84,13 @@ private struct DashboardBackdrop: View {
                     var path = Path()
                     path.move(to: CGPoint(x: 0, y: y))
                     path.addLine(to: CGPoint(x: size.width, y: y))
+
                     context.stroke(
                         path,
                         with: .color(AppTheme.separator),
                         lineWidth: AppTheme.Stroke.hairline
                     )
+
                     y += spacing
                 }
             }
@@ -113,6 +122,7 @@ private struct DateRail: View {
                         .foregroundStyle(AppTheme.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
+
                     Text(state.dateText)
                         .font(AppTheme.Typography.body)
                         .monospacedDigit()
@@ -194,6 +204,7 @@ private struct EnergyArcGauge: View {
     var body: some View {
         let clampedProgress = min(max(progress, 0), 1)
         let endAngle = Angle.degrees(Self.startAngle.degrees + Self.sweepDegrees)
+
         let style = StrokeStyle(
             lineWidth: lineWidth,
             lineCap: .round,
@@ -254,6 +265,7 @@ private struct EnergyArcShape: Shape {
             endAngle: endAngle,
             clockwise: false
         )
+
         return path
     }
 }
@@ -292,6 +304,7 @@ private struct MacroTile: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                 }
+
                 Spacer(minLength: 4)
             }
 
@@ -324,7 +337,7 @@ private struct MacroTile: View {
 
 private struct MacroGradientBar: View {
     let progress: Double
-    let gradientKind: NutritionGradientKind
+    let gradientKind: DataGradientKind
 
     var body: some View {
         GeometryReader { proxy in
@@ -432,10 +445,18 @@ private struct HealthGraphPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(density.padding)
         .background(AppTheme.surfaceRaised)
-        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous))
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: AppTheme.Radius.card,
+                style: .continuous
+            )
+        )
         .overlay {
-            RoundedRectangle(cornerRadius: AppTheme.Radius.card, style: .continuous)
-                .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
+            RoundedRectangle(
+                cornerRadius: AppTheme.Radius.card,
+                style: .continuous
+            )
+            .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
         }
     }
 
@@ -452,9 +473,11 @@ private struct HealthGraphPanel: View {
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: density.detailMaxWidth, alignment: .trailing)
             }
+
         case .compact:
             VStack(alignment: .leading, spacing: 7) {
                 metricBlock
+
                 detailText
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -518,6 +541,7 @@ private struct HealthGraphCanvas: View {
             switch graph.style {
             case .lineArea:
                 drawLineArea(in: plotRect, context: &context)
+
             case .bars:
                 drawBars(in: plotRect, context: &context)
             }
@@ -531,10 +555,16 @@ private struct HealthGraphCanvas: View {
     private func drawGrid(in rect: CGRect, context: inout GraphicsContext) {
         for fraction in [0.25, 0.5, 0.75] {
             let y = rect.minY + rect.height * fraction
+
             var path = Path()
             path.move(to: CGPoint(x: rect.minX, y: y))
             path.addLine(to: CGPoint(x: rect.maxX, y: y))
-            context.stroke(path, with: .color(AppTheme.separator), lineWidth: 1)
+
+            context.stroke(
+                path,
+                with: .color(AppTheme.separator),
+                lineWidth: 1
+            )
         }
     }
 
@@ -544,6 +574,7 @@ private struct HealthGraphCanvas: View {
 
         var linePath = Path()
         linePath.move(to: first)
+
         for point in points.dropFirst() {
             linePath.addLine(to: point)
         }
@@ -586,7 +617,14 @@ private struct HealthGraphCanvas: View {
             let valueY = yPosition(for: sample.normalizedValue, in: rect)
             let top = min(valueY, baselineY)
             let height = max(abs(valueY - baselineY), 2)
-            let barRect = CGRect(x: x, y: top, width: barWidth, height: height)
+
+            let barRect = CGRect(
+                x: x,
+                y: top,
+                width: barWidth,
+                height: height
+            )
+
             let gradientKind =
                 sample.value >= graph.baseline
                 ? graph.gradientKind
@@ -606,6 +644,7 @@ private struct HealthGraphCanvas: View {
             var baseline = Path()
             baseline.move(to: CGPoint(x: rect.minX, y: baselineY))
             baseline.addLine(to: CGPoint(x: rect.maxX, y: baselineY))
+
             context.stroke(
                 baseline,
                 with: .color(AppTheme.strongBorder),
@@ -614,13 +653,23 @@ private struct HealthGraphCanvas: View {
         }
     }
 
-    private func point(for sample: HealthGraphSampleViewState, in rect: CGRect) -> CGPoint {
+    private func point(
+        for sample: HealthGraphSampleViewState,
+        in rect: CGRect
+    ) -> CGPoint {
         let lastIndex = max(graph.samples.count - 1, 1)
         let x = rect.minX + rect.width * CGFloat(sample.index) / CGFloat(lastIndex)
-        return CGPoint(x: x, y: yPosition(for: sample.normalizedValue, in: rect))
+
+        return CGPoint(
+            x: x,
+            y: yPosition(for: sample.normalizedValue, in: rect)
+        )
     }
 
-    private func yPosition(for normalizedValue: Double, in rect: CGRect) -> CGFloat {
+    private func yPosition(
+        for normalizedValue: Double,
+        in rect: CGRect
+    ) -> CGFloat {
         rect.maxY - rect.height * CGFloat(normalizedValue)
     }
 }
@@ -659,16 +708,16 @@ private struct MealSectionView: View {
 
             AlyraSeparator()
 
-            if section.rows.isEmpty {
+            if section.entries.isEmpty {
                 EmptyMealRow()
             } else {
-                ForEach(section.rows) { row in
-                    if row.id != section.rows.first?.id {
+                ForEach(section.entries) { entry in
+                    if entry.id != section.entries.first?.id {
                         AlyraSeparator()
                             .padding(.leading, 14)
                     }
 
-                    DiaryFoodRow(row: row, onDelete: onDelete)
+                    LogFoodRow(entry: entry, onDelete: onDelete)
                         .transition(AppTheme.Motion.rowTransition(reduceMotion: reduceMotion))
                 }
             }
@@ -682,6 +731,7 @@ private struct EmptyMealRow: View {
             Text("No entries")
                 .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.mutedText)
+
             Spacer()
         }
         .padding(.vertical, 14)
@@ -689,43 +739,44 @@ private struct EmptyMealRow: View {
     }
 }
 
-private struct DiaryFoodRow: View {
-    let row: DiaryEntryViewState
+private struct LogFoodRow: View {
+    let entry: LogEntryViewState
     let onDelete: (UUID) -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            FoodIcon(kind: row.iconKind)
+            FoodIcon(kind: entry.iconKind)
 
-            DiaryFoodRowContent(row: row)
+            LogFoodRowContent(entry: entry)
 
             Spacer(minLength: 12)
 
-            Text(row.caloriesText)
+            Text(entry.caloriesText)
                 .font(AppTheme.Typography.bodyStrong)
                 .foregroundStyle(AppTheme.primaryText)
                 .monospacedDigit()
 
-            Button(action: { onDelete(row.id) }) {
+            Button(action: { onDelete(entry.id) }) {
                 Image(systemName: "trash")
             }
             .alyraGhostIconButtonStyle()
-            .accessibilityLabel(row.deleteAccessibilityLabel)
+            .accessibilityLabel(entry.deleteAccessibilityLabel)
         }
         .padding(.vertical, 12)
     }
 }
 
-private struct DiaryFoodRowContent: View {
-    let row: DiaryEntryViewState
+private struct LogFoodRowContent: View {
+    let entry: LogEntryViewState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(row.foodName)
+            Text(entry.foodName)
                 .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.primaryText)
                 .lineLimit(1)
-            Text(row.detailText)
+
+            Text(entry.detailText)
                 .font(AppTheme.Typography.caption)
                 .foregroundStyle(AppTheme.mutedText)
                 .lineLimit(1)

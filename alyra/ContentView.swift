@@ -1,3 +1,10 @@
+//
+//  ContentView.swift
+//  alyra
+//
+//  Created by Viktor Luna on 5/30/26.
+//
+
 import SwiftUI
 
 struct ContentView: View {
@@ -11,19 +18,12 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { proxy in
             let bottomInset = proxy.safeAreaInsets.bottom
+            let appTabPadding = AppTheme.Navigation.contentInset(bottomInset: bottomInset)
 
             ZStack(alignment: .bottom) {
-                DashboardView(
-                    date: dateState,
-                    dateNavigationDirection: dateNavigationDirection,
-                    snapshot: dashboard,
-                    bottomContentInset: AppTheme.Navigation.contentInset(bottomInset: bottomInset),
-                    onPreviousDay: { moveDate(by: -1) },
-                    onNextDay: { moveDate(by: 1) },
-                    onDelete: deleteEntry
-                )
+                selectedContent(appTabPadding: appTabPadding)
 
-                AppBottomNavigation(
+                AppTabBar(
                     selectedTab: $selectedTab,
                     bottomInset: bottomInset
                 )
@@ -34,11 +34,44 @@ struct ContentView: View {
         .background(AppTheme.background)
     }
 
+    @ViewBuilder
+    private func selectedContent(appTabPadding: CGFloat) -> some View {
+        switch selectedTab {
+        case .dashboard:
+            DashboardView(
+                date: dateState,
+                dateNavigationDirection: dateNavigationDirection,
+                snapshot: dashboard,
+                appTabPadding: appTabPadding,
+                onPreviousDay: { moveDate(by: -1) },
+                onNextDay: { moveDate(by: 1) },
+                onDelete: deleteEntry
+            )
+
+        case .add:
+            PlaceholderTabView(
+                title: "Add",
+                subtitle: "Food entry flow goes here.",
+                symbolName: "plus",
+                appTabPadding: appTabPadding
+            )
+
+        case .settings:
+            SettingsView(appTabPadding: appTabPadding)
+        }
+    }
+
     private func moveDate(by days: Int) {
         withAnimation(AppTheme.Motion.dateChange(reduceMotion: reduceMotion)) {
             dateNavigationDirection = days < 0 ? .backward : .forward
+
             let nextDate =
-                Calendar.current.date(byAdding: .day, value: days, to: selectedDate) ?? selectedDate
+                Calendar.current.date(
+                    byAdding: .day,
+                    value: days,
+                    to: selectedDate
+                ) ?? selectedDate
+
             selectedDate = nextDate
         }
     }
@@ -50,11 +83,11 @@ struct ContentView: View {
     }
 
     private var dateState: DashboardDateState {
-        DashboardDateState.make(for: selectedDate)
+        DashboardDateState.from(selectedDate)
     }
 
     private var dashboard: DashboardSnapshot {
-        DashboardSnapshot.make(
+        DashboardSnapshot.from(
             entries: entries,
             analytics: DashboardDemoData.analytics
         )
@@ -91,7 +124,7 @@ private enum AppTab: CaseIterable, Hashable, Identifiable {
     }
 }
 
-private struct AppBottomNavigation: View {
+private struct AppTabBar: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @Binding var selectedTab: AppTab
@@ -100,43 +133,17 @@ private struct AppBottomNavigation: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(AppTab.allCases) { tab in
-                AppBottomNavigationButton(
+                AppTabButton(
                     tab: tab,
                     isSelected: selectedTab == tab
                 ) {
-                    guard selectedTab != tab else { return }
-
-                    withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
-                        selectedTab = tab
-                    }
+                    select(tab)
                 }
             }
         }
         .padding(AppTheme.Navigation.railInnerPadding)
         .frame(height: AppTheme.Navigation.itemHeight + AppTheme.Navigation.railInnerPadding * 2)
-        .background {
-            RoundedRectangle(
-                cornerRadius: AppTheme.Navigation.railCornerRadius,
-                style: .continuous
-            )
-            .fill(
-                LinearGradient(
-                    colors: [
-                        AppTheme.surface.opacity(0.98),
-                        AppTheme.surfaceRaised.opacity(0.92),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Navigation.railCornerRadius,
-                    style: .continuous
-                )
-                .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
-            }
-        }
+        .background(tabBarBackground)
         .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
         .padding(.horizontal, AppTheme.Navigation.railHorizontalPadding)
         .padding(.bottom, AppTheme.Navigation.railBottomPadding + bottomInset)
@@ -144,9 +151,41 @@ private struct AppBottomNavigation: View {
         .frame(height: AppTheme.Navigation.railHeight(bottomInset: bottomInset), alignment: .bottom)
         .accessibilityElement(children: .contain)
     }
+
+    private func select(_ tab: AppTab) {
+        guard selectedTab != tab else { return }
+
+        withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
+            selectedTab = tab
+        }
+    }
+
+    private var tabBarBackground: some View {
+        RoundedRectangle(
+            cornerRadius: AppTheme.Navigation.railCornerRadius,
+            style: .continuous
+        )
+        .fill(
+            LinearGradient(
+                colors: [
+                    AppTheme.surface.opacity(0.98),
+                    AppTheme.surfaceRaised.opacity(0.92),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: AppTheme.Navigation.railCornerRadius,
+                style: .continuous
+            )
+            .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
+        }
+    }
 }
 
-private struct AppBottomNavigationButton: View {
+private struct AppTabButton: View {
     let tab: AppTab
     let isSelected: Bool
     let action: () -> Void
@@ -166,23 +205,7 @@ private struct AppBottomNavigationButton: View {
             .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.mutedText)
             .frame(maxWidth: .infinity)
             .frame(height: AppTheme.Navigation.itemHeight)
-            .background {
-                if isSelected {
-                    RoundedRectangle(
-                        cornerRadius: AppTheme.Navigation.itemCornerRadius,
-                        style: .continuous
-                    )
-                    .fill(AppTheme.surfaceRaised)
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: AppTheme.Navigation.itemCornerRadius,
-                            style: .continuous
-                        )
-                        .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
-                    }
-                    .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
-                }
-            }
+            .background(selectionBackground)
             .contentShape(
                 RoundedRectangle(
                     cornerRadius: AppTheme.Navigation.itemCornerRadius,
@@ -193,6 +216,57 @@ private struct AppBottomNavigationButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    @ViewBuilder
+    private var selectionBackground: some View {
+        if isSelected {
+            RoundedRectangle(
+                cornerRadius: AppTheme.Navigation.itemCornerRadius,
+                style: .continuous
+            )
+            .fill(AppTheme.surfaceRaised)
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Navigation.itemCornerRadius,
+                    style: .continuous
+                )
+                .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
+            }
+            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
+        }
+    }
+}
+
+private struct PlaceholderTabView: View {
+    let title: String
+    let subtitle: String
+    let symbolName: String
+    let appTabPadding: CGFloat
+
+    var body: some View {
+        ZStack {
+            AppTheme.background
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Image(systemName: symbolName)
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(AppTheme.secondaryText)
+
+                Text(title)
+                    .font(AppTheme.Typography.header)
+                    .foregroundStyle(AppTheme.primaryText)
+
+                Text(subtitle)
+                    .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.mutedText)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(AppTheme.Spacing.screen)
+            .padding(.bottom, appTabPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 }
 

@@ -1,3 +1,10 @@
+//
+//  AppTheme.swift
+//  alyra
+//
+//  Created by Viktor Luna on 5/30/26.
+//
+
 import SwiftUI
 
 #if canImport(UIKit)
@@ -105,22 +112,35 @@ enum AppTheme {
     static let mutedText = Color(light: 0x8A877F, dark: 0x77736C)
 
     static let border = Color(
-        light: 0x000000, dark: 0xFFFFFF, lightOpacity: 0.055, darkOpacity: 0.075)
+        light: 0x000000,
+        dark: 0xFFFFFF,
+        lightOpacity: 0.055,
+        darkOpacity: 0.075
+    )
+
     static let separator = Color(
-        light: 0x000000, dark: 0xFFFFFF, lightOpacity: 0.035, darkOpacity: 0.055)
+        light: 0x000000,
+        dark: 0xFFFFFF,
+        lightOpacity: 0.035,
+        darkOpacity: 0.055
+    )
+
     static let strongBorder = Color(
         light: 0x000000,
         dark: 0xFFFFFF,
         lightOpacity: 0.095,
         darkOpacity: 0.12
     )
+
     static let controlFill = Color(
         light: 0x000000,
         dark: 0xFFFFFF,
         lightOpacity: 0.025,
         darkOpacity: 0.040
     )
+
     static let accent = Color(light: 0x080807, dark: 0xF5F2EA)
+
     static let tickTrack = Color(
         light: 0x000000,
         dark: 0xFFFFFF,
@@ -128,7 +148,7 @@ enum AppTheme {
         darkOpacity: 0.10
     )
 
-    static func dataProgressGradient(_ kind: NutritionGradientKind) -> LinearGradient {
+    static func dataProgressGradient(_ kind: DataGradientKind) -> LinearGradient {
         LinearGradient(
             colors: dataColors(kind),
             startPoint: .leading,
@@ -137,7 +157,7 @@ enum AppTheme {
     }
 
     static func dataAngularGradient(
-        _ kind: NutritionGradientKind,
+        _ kind: DataGradientKind,
         startAngle: Angle,
         endAngle: Angle
     ) -> AngularGradient {
@@ -149,17 +169,15 @@ enum AppTheme {
         )
     }
 
-    static func dataAccent(_ kind: NutritionGradientKind) -> Color {
+    static func dataAccent(_ kind: DataGradientKind) -> Color {
         dataColor(kind, fraction: 0.22)
     }
 
-    static func dataGradientColors(
-        _ kind: NutritionGradientKind
-    ) -> [Color] {
+    static func dataGradientColors(_ kind: DataGradientKind) -> [Color] {
         dataColors(kind)
     }
 
-    static func dataAreaGradientColors(_ kind: NutritionGradientKind) -> [Color] {
+    static func dataAreaGradientColors(_ kind: DataGradientKind) -> [Color] {
         [
             dataColor(kind, fraction: 0.12).opacity(0.14),
             dataColor(kind, fraction: 0.62).opacity(0.06),
@@ -168,7 +186,7 @@ enum AppTheme {
     }
 
     private static func dataColor(
-        _ kind: NutritionGradientKind,
+        _ kind: DataGradientKind,
         fraction: Double
     ) -> Color {
         let clampedFraction = min(max(fraction, 0), 1)
@@ -180,37 +198,48 @@ enum AppTheme {
         )
     }
 
-    private static func dataColors(_ kind: NutritionGradientKind) -> [Color] {
-        return [
+    private static func dataColors(_ kind: DataGradientKind) -> [Color] {
+        [
             Color(
                 light: dataHexStops(kind).light.0,
-                dark: dataHexStops(kind).dark.0),
+                dark: dataHexStops(kind).dark.0
+            ),
             Color(
                 light: dataHexStops(kind).light.1,
-                dark: dataHexStops(kind).dark.1),
+                dark: dataHexStops(kind).dark.1
+            ),
         ]
     }
 
     private static func dataHexStops(
-        _ kind: NutritionGradientKind
+        _ kind: DataGradientKind
     ) -> (light: (UInt, UInt), dark: (UInt, UInt)) {
         switch kind {
         case .energy, .protein, .weight:
             return ((0x24231F, 0x615D55), (0xF1EDE5, 0xBCB6AC))
+
         case .carbs, .fat, .expenditure:
             return ((0x34322E, 0x746F66), (0xE6DFD4, 0xABA49A))
+
         case .balancePositive:
             return ((0x292824, 0x5D5951), (0xEEE9DF, 0xB5AEA4))
+
         case .balanceNegative:
             return ((0x54514A, 0x858177), (0xCBC4BA, 0x918B81))
+
         case .poultry, .yogurt, .berries, .shake:
             return ((0x3B3832, 0x827D73), (0xDAD3C8, 0x9D968B))
+
         case .generic:
             return ((0x646059, 0x9A958B), (0xAAA49A, 0xEEE9DF))
         }
     }
 
-    private static func interpolateHex(_ start: UInt, _ end: UInt, fraction: Double) -> UInt {
+    private static func interpolateHex(
+        _ start: UInt,
+        _ end: UInt,
+        fraction: Double
+    ) -> UInt {
         let red = interpolateChannel(start >> 16, end >> 16, fraction: fraction)
         let green = interpolateChannel(start >> 8, end >> 8, fraction: fraction)
         let blue = interpolateChannel(start, end, fraction: fraction)
@@ -218,9 +247,14 @@ enum AppTheme {
         return (red << 16) | (green << 8) | blue
     }
 
-    private static func interpolateChannel(_ start: UInt, _ end: UInt, fraction: Double) -> UInt {
+    private static func interpolateChannel(
+        _ start: UInt,
+        _ end: UInt,
+        fraction: Double
+    ) -> UInt {
         let startValue = Double(start & 0xFF)
         let endValue = Double(end & 0xFF)
+
         return UInt((startValue + (endValue - startValue) * fraction).rounded())
     }
 }
@@ -234,12 +268,17 @@ struct AlyraIconButtonStyle: ButtonStyle {
         configuration.label
             .font(.callout.weight(.semibold))
             .foregroundStyle(foreground)
-            .frame(width: AppTheme.Control.minimumHitSize, height: AppTheme.Control.minimumHitSize)
+            .frame(
+                width: AppTheme.Control.minimumHitSize,
+                height: AppTheme.Control.minimumHitSize
+            )
             .contentShape(Rectangle())
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
             .offset(y: configuration.isPressed && !reduceMotion ? 1 : 0)
             .animation(
-                AppTheme.Motion.press(reduceMotion: reduceMotion), value: configuration.isPressed)
+                AppTheme.Motion.press(reduceMotion: reduceMotion),
+                value: configuration.isPressed
+            )
     }
 }
 
@@ -252,22 +291,36 @@ struct AlyraGhostIconButtonStyle: ButtonStyle {
         configuration.label
             .font(.caption.weight(.semibold))
             .foregroundStyle(foreground)
-            .frame(width: AppTheme.Control.minimumHitSize, height: AppTheme.Control.minimumHitSize)
+            .frame(
+                width: AppTheme.Control.minimumHitSize,
+                height: AppTheme.Control.minimumHitSize
+            )
             .contentShape(Rectangle())
             .background(configuration.isPressed ? AppTheme.controlFill : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Radius.control, style: .continuous))
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Radius.control,
+                    style: .continuous
+                )
+            )
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
             .animation(
-                AppTheme.Motion.press(reduceMotion: reduceMotion), value: configuration.isPressed)
+                AppTheme.Motion.press(reduceMotion: reduceMotion),
+                value: configuration.isPressed
+            )
     }
 }
 
 extension View {
-    func alyraIconButtonStyle(foreground: Color = AppTheme.secondaryText) -> some View {
+    func alyraIconButtonStyle(
+        foreground: Color = AppTheme.secondaryText
+    ) -> some View {
         buttonStyle(AlyraIconButtonStyle(foreground: foreground))
     }
 
-    func alyraGhostIconButtonStyle(foreground: Color = AppTheme.mutedText) -> some View {
+    func alyraGhostIconButtonStyle(
+        foreground: Color = AppTheme.mutedText
+    ) -> some View {
         buttonStyle(AlyraGhostIconButtonStyle(foreground: foreground))
     }
 }
