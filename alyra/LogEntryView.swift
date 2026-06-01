@@ -3,6 +3,7 @@ import SwiftUI
 struct LogEntryView: View {
     let date: Date
     let appTabPadding: CGFloat
+    let unitSystem: UnitSystem
     let onSaveFood: (FoodLogEntry) -> Void
     let onSaveWeight: (WeightLogEntry) -> Void
 
@@ -16,7 +17,7 @@ struct LogEntryView: View {
     @State private var carbs = ""
     @State private var fat = ""
     @State private var fiber = ""
-    @State private var weightPounds = ""
+    @State private var weightValue = ""
     @State private var weightNote = ""
 
     var body: some View {
@@ -43,6 +44,7 @@ struct LogEntryView: View {
                 .padding(.top, 2)
                 .padding(.bottom, appTabPadding)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .foregroundStyle(AppTheme.primaryText)
         .tint(AppTheme.accent)
@@ -62,12 +64,43 @@ struct LogEntryView: View {
     }
 
     private var typePicker: some View {
-        Picker("Entry type", selection: $entryType) {
+        HStack(spacing: 8) {
             ForEach(LogEntryType.allCases) { type in
-                Label(type.rawValue, systemImage: type.symbolName).tag(type)
+                Button {
+                    entryType = type
+                } label: {
+                    Label(type.rawValue, systemImage: type.symbolName)
+                        .font(AppTheme.Typography.bodyStrong)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 42)
+                        .foregroundStyle(entryType == type ? AppTheme.primaryText : AppTheme.mutedText)
+                        .background(entryType == type ? AppTheme.controlFill : .clear)
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: AppTheme.Radius.control,
+                                style: .continuous
+                            )
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(entryType == type ? [.isSelected] : [])
             }
         }
-        .pickerStyle(.segmented)
+        .padding(4)
+        .background(AppTheme.surfaceRaised)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: AppTheme.Radius.card,
+                style: .continuous
+            )
+        )
+        .overlay {
+            RoundedRectangle(
+                cornerRadius: AppTheme.Radius.card,
+                style: .continuous
+            )
+            .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
+        }
         .accessibilityLabel("Entry type")
     }
 
@@ -167,9 +200,9 @@ struct LogEntryView: View {
             LogTextField(
                 title: "Weight",
                 placeholder: "0",
-                text: $weightPounds,
+                text: $weightValue,
                 keyboardType: .decimalPad,
-                suffix: "lb"
+                suffix: unitSystem.weightUnitName
             )
 
             LogTextField(
@@ -215,7 +248,7 @@ struct LogEntryView: View {
     }
 
     private var isWeightSaveEnabled: Bool {
-        weightPounds.doubleValue != nil
+        weightValue.doubleValue != nil
     }
 
     private func saveFood() {
@@ -252,7 +285,7 @@ struct LogEntryView: View {
     }
 
     private func saveWeight() {
-        guard let weightPounds = weightPounds.doubleValue else {
+        guard let weightValue = weightValue.doubleValue else {
             return
         }
 
@@ -260,7 +293,8 @@ struct LogEntryView: View {
             WeightLogEntry(
                 id: UUID(),
                 loggedAt: date,
-                weightPounds: weightPounds,
+                displayWeight: weightValue,
+                unitSystem: unitSystem,
                 note: weightNote.trimmed
             )
         )
@@ -280,7 +314,7 @@ struct LogEntryView: View {
     }
 
     private func resetWeightForm() {
-        weightPounds = ""
+        weightValue = ""
         weightNote = ""
     }
 }
@@ -291,6 +325,15 @@ private struct LogTextField: View {
     @Binding var text: String
     let keyboardType: UIKeyboardType
     var suffix: String?
+
+    private var autocapitalization: TextInputAutocapitalization {
+        switch keyboardType {
+        case .default:
+            return .words
+        default:
+            return .never
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -304,8 +347,8 @@ private struct LogTextField: View {
                 TextField(placeholder, text: $text)
                     .font(AppTheme.Typography.body)
                     .keyboardType(keyboardType)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(autocapitalization)
+                    .autocorrectionDisabled(keyboardType != .default)
 
                 if let suffix {
                     Text(suffix)
@@ -366,6 +409,7 @@ private extension String {
     LogEntryView(
         date: .now,
         appTabPadding: 90,
+        unitSystem: .imperial,
         onSaveFood: { _ in },
         onSaveWeight: { _ in }
     )

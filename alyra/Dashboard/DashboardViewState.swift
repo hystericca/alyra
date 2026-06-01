@@ -187,27 +187,36 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
         )
     )
 
-    static func from(weightEntries: [WeightLogEntry]) -> DashboardAnalyticsViewState {
+    static func empty(unitSystem: UnitSystem) -> DashboardAnalyticsViewState {
+        var analytics = DashboardAnalyticsViewState.empty
+        analytics.weightTrend.unitText = unitSystem.weightUnitName
+        return analytics
+    }
+
+    static func from(
+        weightEntries: [WeightLogEntry],
+        unitSystem: UnitSystem
+    ) -> DashboardAnalyticsViewState {
         let sortedEntries = weightEntries.sorted { $0.loggedAt < $1.loggedAt }
         let recentEntries = Array(sortedEntries.suffix(14))
-        let weights = recentEntries.map(\.weightPounds)
+        let weights = recentEntries.map { $0.displayWeight(for: unitSystem) }
 
         guard let latestWeight = weights.last else {
-            return .empty
+            return .empty(unitSystem: unitSystem)
         }
 
         let firstWeight = weights.first ?? latestWeight
         let delta = latestWeight - firstWeight
         let deltaPrefix = delta > 0 ? "+" : ""
 
-        var analytics = DashboardAnalyticsViewState.empty
+        var analytics = DashboardAnalyticsViewState.empty(unitSystem: unitSystem)
         analytics.weightTrend = HealthGraphViewState(
             id: "weight",
             title: "Weight",
             symbolName: "scalemass",
             valueText: DashboardNumberText.oneDecimal(latestWeight),
-            unitText: "lb",
-            detailText: "\(deltaPrefix)\(DashboardNumberText.oneDecimal(delta)) lb / \(weights.count)d",
+            unitText: unitSystem.weightUnitName,
+            detailText: "\(deltaPrefix)\(DashboardNumberText.oneDecimal(delta)) \(unitSystem.weightUnitName) / \(weights.count)d",
             style: .lineArea,
             gradientKind: .weight,
             negativeGradientKind: nil,

@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+#if canImport(UIKit)
+    import UIKit
+#endif
+
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -15,10 +19,12 @@ struct ContentView: View {
     @State private var dateNavigationDirection = DateNavigationDirection.forward
     @State private var entries = FoodLogStore.load()
     @State private var weightEntries = WeightLogStore.load()
+    @State private var isKeyboardVisible = false
     @AppStorage(AppSettingsKeys.dailyCalories) private var dailyCalories = 2_200.0
     @AppStorage(AppSettingsKeys.proteinTarget) private var proteinTarget = 140.0
     @AppStorage(AppSettingsKeys.carbsTarget) private var carbsTarget = 250.0
     @AppStorage(AppSettingsKeys.fatTarget) private var fatTarget = 70.0
+    @AppStorage(AppSettingsKeys.unitSystem) private var unitSystem = UnitSystem.imperial.rawValue
 
     var body: some View {
         GeometryReader { proxy in
@@ -32,11 +38,20 @@ struct ContentView: View {
                     selectedTab: $selectedTab,
                     bottomInset: bottomInset
                 )
+                .opacity(isKeyboardVisible ? 0 : 1)
+                .allowsHitTesting(!isKeyboardVisible)
+                .accessibilityHidden(isKeyboardVisible)
                 .zIndex(1)
             }
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .background(AppTheme.background)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            setKeyboardVisible(true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            setKeyboardVisible(false)
+        }
     }
 
     @ViewBuilder
@@ -57,6 +72,7 @@ struct ContentView: View {
             LogEntryView(
                 date: selectedDate,
                 appTabPadding: appTabPadding,
+                unitSystem: selectedUnitSystem,
                 onSaveFood: addEntry,
                 onSaveWeight: addWeightEntry
             )
@@ -104,6 +120,12 @@ struct ContentView: View {
         }
     }
 
+    private func setKeyboardVisible(_ isVisible: Bool) {
+        guard isKeyboardVisible != isVisible else { return }
+
+        isKeyboardVisible = isVisible
+    }
+
     private var dateState: DashboardDateState {
         DashboardDateState.from(selectedDate)
     }
@@ -112,7 +134,10 @@ struct ContentView: View {
         DashboardSnapshot.from(
             entries: entriesForSelectedDate,
             targets: targets,
-            analytics: DashboardAnalyticsViewState.from(weightEntries: weightEntriesForTrend)
+            analytics: DashboardAnalyticsViewState.from(
+                weightEntries: weightEntriesForTrend,
+                unitSystem: selectedUnitSystem
+            )
         )
     }
 
@@ -123,6 +148,10 @@ struct ContentView: View {
             carbs: carbsTarget,
             fat: fatTarget
         )
+    }
+
+    private var selectedUnitSystem: UnitSystem {
+        UnitSystem(rawValue: unitSystem) ?? .imperial
     }
 
     private var entriesForSelectedDate: [FoodLogEntry] {

@@ -76,12 +76,35 @@ struct AlyraTests {
     }
 
     @Test func weightEntriesBuildWeightTrendAnalytics() {
-        let analytics = DashboardAnalyticsViewState.from(weightEntries: Self.weightEntries)
+        let analytics = DashboardAnalyticsViewState.from(
+            weightEntries: Self.weightEntries,
+            unitSystem: .imperial
+        )
 
         #expect(analytics.weightTrend.valueText == "181.4")
         #expect(analytics.weightTrend.detailText == "-2.8 lb / 3d")
         #expect(analytics.weightTrend.samples.count == 3)
         #expect(analytics.expenditure.samples.isEmpty)
+    }
+
+    @Test func weightEntriesUseMetricUnitsWhenSelected() {
+        let analytics = DashboardAnalyticsViewState.from(
+            weightEntries: Self.weightEntries,
+            unitSystem: .metric
+        )
+
+        #expect(analytics.weightTrend.unitText == "kg")
+        #expect(analytics.weightTrend.valueText == "82.3")
+    }
+
+    @Test func emptyWeightAnalyticsUseSelectedUnits() {
+        let analytics = DashboardAnalyticsViewState.from(
+            weightEntries: [],
+            unitSystem: .metric
+        )
+
+        #expect(analytics.weightTrend.unitText == "kg")
+        #expect(analytics.weightTrend.samples.isEmpty)
     }
 
     private static let entries = [
@@ -136,19 +159,22 @@ struct AlyraTests {
         WeightLogEntry(
             id: UUID(uuidString: "DDE9A2A0-3B8A-4862-A40C-4FDC90EC41C1")!,
             loggedAt: Date(timeIntervalSinceReferenceDate: 0),
-            weightPounds: 184.2,
+            displayWeight: 184.2,
+            unitSystem: .imperial,
             note: ""
         ),
         WeightLogEntry(
             id: UUID(uuidString: "586E7E93-2D2C-42DD-86D2-5DC3EBD4DB3D")!,
             loggedAt: Date(timeIntervalSinceReferenceDate: 86_400),
-            weightPounds: 182.6,
+            displayWeight: 182.6,
+            unitSystem: .imperial,
             note: ""
         ),
         WeightLogEntry(
             id: UUID(uuidString: "17C7BF17-1C91-40C6-80A6-962525B3E9F4")!,
             loggedAt: Date(timeIntervalSinceReferenceDate: 172_800),
-            weightPounds: 181.4,
+            displayWeight: 181.4,
+            unitSystem: .imperial,
             note: ""
         ),
     ]

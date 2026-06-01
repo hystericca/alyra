@@ -30,6 +30,27 @@ nonisolated enum LogEntryType: String, CaseIterable, Codable, Identifiable, Send
     }
 }
 
+nonisolated enum UnitSystem: String, CaseIterable, Identifiable, Sendable {
+    case imperial = "Imperial"
+    case metric = "Metric"
+
+    var id: String { rawValue }
+
+    var weightUnitName: String {
+        switch self {
+        case .imperial: "lb"
+        case .metric: "kg"
+        }
+    }
+
+    var weightUnit: UnitMass {
+        switch self {
+        case .imperial: .pounds
+        case .metric: .kilograms
+        }
+    }
+}
+
 nonisolated struct NutritionFacts: Codable, Equatable, Sendable {
     var calories: Double
     var protein: Double
@@ -97,8 +118,87 @@ nonisolated struct FoodLogEntry: Codable, Identifiable, Equatable, Sendable {
 nonisolated struct WeightLogEntry: Codable, Identifiable, Equatable, Sendable {
     var id: UUID
     var loggedAt: Date
-    var weightPounds: Double
+    var weightKilograms: Double
     var note: String
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case loggedAt
+        case weightKilograms
+        case weightPounds
+        case note
+    }
+
+    init(
+        id: UUID,
+        loggedAt: Date,
+        weightKilograms: Double,
+        note: String
+    ) {
+        self.id = id
+        self.loggedAt = loggedAt
+        self.weightKilograms = weightKilograms
+        self.note = note
+    }
+
+    init(
+        id: UUID,
+        loggedAt: Date,
+        displayWeight: Double,
+        unitSystem: UnitSystem,
+        note: String
+    ) {
+        let measurement = Measurement(
+            value: displayWeight,
+            unit: unitSystem.weightUnit
+        ).converted(to: .kilograms)
+
+        self.init(
+            id: id,
+            loggedAt: loggedAt,
+            weightKilograms: measurement.value,
+            note: note
+        )
+    }
+
+    func displayWeight(for unitSystem: UnitSystem) -> Double {
+        Measurement(
+            value: weightKilograms,
+            unit: UnitMass.kilograms
+        )
+        .converted(to: unitSystem.weightUnit)
+        .value
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        loggedAt = try container.decode(Date.self, forKey: .loggedAt)
+        note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
+
+        if let weightKilograms = try container.decodeIfPresent(
+            Double.self,
+            forKey: .weightKilograms
+        ) {
+            self.weightKilograms = weightKilograms
+        } else {
+            let weightPounds = try container.decode(Double.self, forKey: .weightPounds)
+            self.weightKilograms = Measurement(
+                value: weightPounds,
+                unit: UnitMass.pounds
+            )
+            .converted(to: .kilograms)
+            .value
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(loggedAt, forKey: .loggedAt)
+        try container.encode(weightKilograms, forKey: .weightKilograms)
+        try container.encode(note, forKey: .note)
+    }
 }
 
 nonisolated struct MealSection: Identifiable, Equatable, Sendable {

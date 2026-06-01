@@ -8,13 +8,6 @@ enum AppSettingsKeys {
     static let unitSystem = "alyra.settings.unitSystem"
 }
 
-private enum UnitSystem: String, CaseIterable, Identifiable {
-    case imperial = "Imperial"
-    case metric = "Metric"
-
-    var id: String { rawValue }
-}
-
 struct SettingsView: View {
     let appTabPadding: CGFloat
 
