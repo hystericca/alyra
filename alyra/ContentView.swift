@@ -20,6 +20,7 @@ struct ContentView: View {
     @State private var entries = FoodLogStore.load()
     @State private var weightEntries = WeightLogStore.load()
     @State private var isKeyboardVisible = false
+    @State private var editingFoodEntry: FoodLogEntry?
     @AppStorage(AppSettingsKeys.dailyCalories) private var dailyCalories = 2_200.0
     @AppStorage(AppSettingsKeys.proteinTarget) private var proteinTarget = 140.0
     @AppStorage(AppSettingsKeys.carbsTarget) private var carbsTarget = 250.0
@@ -52,6 +53,11 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             setKeyboardVisible(false)
         }
+        .onChange(of: selectedTab) { _, tab in
+            if tab != .add {
+                editingFoodEntry = nil
+            }
+        }
     }
 
     @ViewBuilder
@@ -65,12 +71,14 @@ struct ContentView: View {
                 appTabPadding: appTabPadding,
                 onPreviousDay: { moveDate(by: -1) },
                 onNextDay: { moveDate(by: 1) },
+                onEdit: editEntry,
                 onDelete: deleteEntry
             )
 
         case .add:
             LogEntryView(
                 date: selectedDate,
+                editingFoodEntry: editingFoodEntry,
                 appTabPadding: appTabPadding,
                 unitSystem: selectedUnitSystem,
                 onSaveFood: addEntry,
@@ -104,10 +112,28 @@ struct ContentView: View {
         }
     }
 
+    private func editEntry(id: UUID) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+
+        editingFoodEntry = entry
+        selectedDate = entry.loggedAt
+
+        withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
+            selectedTab = .add
+        }
+    }
+
     private func addEntry(_ entry: FoodLogEntry) {
         withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
-            entries.append(entry)
+            if let index = entries.firstIndex(where: { $0.id == entry.id }) {
+                entries[index] = entry
+            } else {
+                entries.append(entry)
+            }
+
             FoodLogStore.save(entries)
+            selectedDate = entry.loggedAt
+            editingFoodEntry = nil
             selectedTab = .dashboard
         }
     }
@@ -116,6 +142,7 @@ struct ContentView: View {
         withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
             weightEntries.append(entry)
             WeightLogStore.save(weightEntries)
+            selectedDate = entry.loggedAt
             selectedTab = .dashboard
         }
     }
@@ -135,8 +162,11 @@ struct ContentView: View {
             entries: entriesForSelectedDate,
             targets: targets,
             analytics: DashboardAnalyticsViewState.from(
+                foodEntries: entriesForTrend,
+                targets: targets,
                 weightEntries: weightEntriesForTrend,
-                unitSystem: selectedUnitSystem
+                unitSystem: selectedUnitSystem,
+                through: selectedDate
             )
         )
     }
@@ -157,6 +187,12 @@ struct ContentView: View {
     private var entriesForSelectedDate: [FoodLogEntry] {
         entries
             .filter { Calendar.current.isDate($0.loggedAt, inSameDayAs: selectedDate) }
+            .sorted { $0.loggedAt < $1.loggedAt }
+    }
+
+    private var entriesForTrend: [FoodLogEntry] {
+        entries
+            .filter { $0.loggedAt <= selectedDate || Calendar.current.isDate($0.loggedAt, inSameDayAs: selectedDate) }
             .sorted { $0.loggedAt < $1.loggedAt }
     }
 

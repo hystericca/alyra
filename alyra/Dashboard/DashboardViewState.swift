@@ -161,11 +161,11 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
         ),
         expenditure: HealthGraphViewState(
             id: "expenditure",
-            title: "Expenditure",
-            symbolName: "flame",
+            title: "Energy intake",
+            symbolName: "fork.knife",
             valueText: "--",
             unitText: "kcal",
-            detailText: "No data",
+            detailText: "No entries yet",
             style: .bars,
             gradientKind: .expenditure,
             negativeGradientKind: nil,
@@ -194,36 +194,106 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
     }
 
     static func from(
+        foodEntries: [FoodLogEntry],
+        targets: DailyTargets,
         weightEntries: [WeightLogEntry],
-        unitSystem: UnitSystem
+        unitSystem: UnitSystem,
+        through date: Date,
+        calendar: Calendar = .current
     ) -> DashboardAnalyticsViewState {
-        let sortedEntries = weightEntries.sorted { $0.loggedAt < $1.loggedAt }
-        let recentEntries = Array(sortedEntries.suffix(14))
-        let weights = recentEntries.map { $0.displayWeight(for: unitSystem) }
+        var analytics = DashboardAnalyticsViewState.empty(unitSystem: unitSystem)
+        let dayStarts = Self.dayStarts(endingAt: date, calendar: calendar)
+        let dailyCalories = Self.dailyCalories(
+            from: foodEntries,
+            dayStarts: dayStarts,
+            calendar: calendar
+        )
+        let energyBalance = dailyCalories.map { $0 - targets.calories }
 
-        guard let latestWeight = weights.last else {
-            return .empty(unitSystem: unitSystem)
+        if let latestCalories = dailyCalories.last, dailyCalories.contains(where: { $0 > 0 }) {
+            let averageCalories = dailyCalories.reduce(0, +) / Double(dailyCalories.count)
+            analytics.expenditure = HealthGraphViewState(
+                id: "intake",
+                title: "Energy intake",
+                symbolName: "fork.knife",
+                valueText: DashboardNumberText.wholeNumber(latestCalories),
+                unitText: "kcal",
+                detailText: "\(DashboardNumberText.wholeNumber(averageCalories)) kcal 14d avg",
+                style: .bars,
+                gradientKind: .expenditure,
+                negativeGradientKind: nil,
+                baselineRule: .zero,
+                values: dailyCalories
+            )
         }
 
-        let firstWeight = weights.first ?? latestWeight
-        let delta = latestWeight - firstWeight
-        let deltaPrefix = delta > 0 ? "+" : ""
+        if let latestBalance = energyBalance.last, dailyCalories.contains(where: { $0 > 0 }) {
+            let averageBalance = energyBalance.reduce(0, +) / Double(energyBalance.count)
+            analytics.energyBalance = HealthGraphViewState(
+                id: "balance",
+                title: "Energy balance",
+                symbolName: "plus.forwardslash.minus",
+                valueText: DashboardNumberText.signedWholeNumber(latestBalance),
+                unitText: "kcal",
+                detailText: "\(DashboardNumberText.signedWholeNumber(averageBalance)) kcal 14d avg",
+                style: .bars,
+                gradientKind: .balancePositive,
+                negativeGradientKind: .balanceNegative,
+                baselineRule: .zero,
+                values: energyBalance
+            )
+        }
 
-        var analytics = DashboardAnalyticsViewState.empty(unitSystem: unitSystem)
-        analytics.weightTrend = HealthGraphViewState(
-            id: "weight",
-            title: "Weight",
-            symbolName: "scalemass",
-            valueText: DashboardNumberText.oneDecimal(latestWeight),
-            unitText: unitSystem.weightUnitName,
-            detailText: "\(deltaPrefix)\(DashboardNumberText.oneDecimal(delta)) \(unitSystem.weightUnitName) / \(weights.count)d",
-            style: .lineArea,
-            gradientKind: .weight,
-            negativeGradientKind: nil,
-            values: weights
-        )
+        let sortedWeightEntries = weightEntries.sorted { $0.loggedAt < $1.loggedAt }
+        let recentWeightEntries = Array(sortedWeightEntries.suffix(14))
+        let weights = recentWeightEntries.map { $0.displayWeight(for: unitSystem) }
+
+        if let latestWeight = weights.last {
+            let firstWeight = weights.first ?? latestWeight
+            let delta = latestWeight - firstWeight
+
+            analytics.weightTrend = HealthGraphViewState(
+                id: "weight",
+                title: "Weight",
+                symbolName: "scalemass",
+                valueText: DashboardNumberText.oneDecimal(latestWeight),
+                unitText: unitSystem.weightUnitName,
+                detailText: "\(DashboardNumberText.signedOneDecimal(delta)) \(unitSystem.weightUnitName) / \(weights.count)d",
+                style: .lineArea,
+                gradientKind: .weight,
+                negativeGradientKind: nil,
+                values: weights
+            )
+        }
 
         return analytics
+    }
+
+    private static func dayStarts(
+        endingAt date: Date,
+        calendar: Calendar
+    ) -> [Date] {
+        let endOfRange = calendar.startOfDay(for: date)
+
+        return (0..<14).compactMap { offset in
+            calendar.date(
+                byAdding: .day,
+                value: offset - 13,
+                to: endOfRange
+            )
+        }
+    }
+
+    private static func dailyCalories(
+        from entries: [FoodLogEntry],
+        dayStarts: [Date],
+        calendar: Calendar
+    ) -> [Double] {
+        dayStarts.map { dayStart in
+            entries
+                .filter { calendar.isDate($0.loggedAt, inSameDayAs: dayStart) }
+                .reduce(0) { $0 + $1.nutrients.calories }
+        }
     }
 }
 
@@ -346,15 +416,19 @@ nonisolated struct LogEntryViewState: Identifiable, Equatable, Sendable {
     var detailText: String
     var iconKind: FoodIconKind
     var caloriesText: String
+    var editAccessibilityLabel: String
     var deleteAccessibilityLabel: String
 
     init(entry: FoodLogEntry) {
         id = entry.id
         foodName = entry.foodName
+        let timeText = entry.loggedAt.formatted(Date.FormatStyle.dateTime.hour().minute())
         let servingText = "\(DashboardNumberText.wholeNumber(entry.servingGrams)) g"
-        detailText = entry.brand.isEmpty ? servingText : "\(servingText) - \(entry.brand)"
+        let foodDetailText = entry.brand.isEmpty ? servingText : "\(servingText) - \(entry.brand)"
+        detailText = "\(timeText) - \(foodDetailText)"
         iconKind = FoodIconKind.guess(for: entry)
         caloriesText = DashboardNumberText.wholeNumber(entry.nutrients.calories)
+        editAccessibilityLabel = "Edit \(entry.foodName)"
         deleteAccessibilityLabel = "Delete \(entry.foodName)"
     }
 }
@@ -368,8 +442,18 @@ nonisolated enum DashboardNumberText {
         value.formatted(wholeNumberStyle)
     }
 
+    static func signedWholeNumber(_ value: Double) -> String {
+        let formattedValue = wholeNumber(value)
+        return value > 0 ? "+\(formattedValue)" : formattedValue
+    }
+
     static func oneDecimal(_ value: Double) -> String {
         value.formatted(.number.precision(.fractionLength(1)))
+    }
+
+    static func signedOneDecimal(_ value: Double) -> String {
+        let formattedValue = oneDecimal(value)
+        return value > 0 ? "+\(formattedValue)" : formattedValue
     }
 
     static func progress(value: Double, target: Double) -> Double {

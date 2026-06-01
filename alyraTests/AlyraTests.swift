@@ -52,7 +52,8 @@ struct AlyraTests {
         #expect(snapshot.analytics.weightTrend.samples.isEmpty)
         #expect(snapshot.analytics.energyBalance.baseline == 0)
         #expect(snapshot.sections.first { $0.mealTime == .breakfast }?.totalCaloriesText == "192 kcal")
-        #expect(snapshot.sections.first?.entries.first?.detailText == "170 g - Plain, 2%")
+        let firstEntryTime = Self.entries[0].loggedAt.formatted(Date.FormatStyle.dateTime.hour().minute())
+        #expect(snapshot.sections.first?.entries.first?.detailText == "\(firstEntryTime) - 170 g - Plain, 2%")
         #expect(snapshot.sections.first?.entries.first?.iconKind == .yogurt)
     }
 
@@ -77,8 +78,11 @@ struct AlyraTests {
 
     @Test func weightEntriesBuildWeightTrendAnalytics() {
         let analytics = DashboardAnalyticsViewState.from(
+            foodEntries: [],
+            targets: .standard,
             weightEntries: Self.weightEntries,
-            unitSystem: .imperial
+            unitSystem: .imperial,
+            through: Self.referenceDate
         )
 
         #expect(analytics.weightTrend.valueText == "181.4")
@@ -89,8 +93,11 @@ struct AlyraTests {
 
     @Test func weightEntriesUseMetricUnitsWhenSelected() {
         let analytics = DashboardAnalyticsViewState.from(
+            foodEntries: [],
+            targets: .standard,
             weightEntries: Self.weightEntries,
-            unitSystem: .metric
+            unitSystem: .metric,
+            through: Self.referenceDate
         )
 
         #expect(analytics.weightTrend.unitText == "kg")
@@ -99,13 +106,41 @@ struct AlyraTests {
 
     @Test func emptyWeightAnalyticsUseSelectedUnits() {
         let analytics = DashboardAnalyticsViewState.from(
+            foodEntries: [],
+            targets: .standard,
             weightEntries: [],
-            unitSystem: .metric
+            unitSystem: .metric,
+            through: Self.referenceDate
         )
 
         #expect(analytics.weightTrend.unitText == "kg")
         #expect(analytics.weightTrend.samples.isEmpty)
     }
+
+    @Test func foodEntriesBuildIntakeAndBalanceTrends() {
+        let analytics = DashboardAnalyticsViewState.from(
+            foodEntries: Self.entries,
+            targets: DailyTargets.standard,
+            weightEntries: [],
+            unitSystem: .imperial,
+            through: Date(timeIntervalSinceReferenceDate: 7_200)
+        )
+
+        #expect(analytics.expenditure.title == "Energy intake")
+        #expect(analytics.expenditure.valueText == "1,042")
+        #expect(analytics.expenditure.samples.count == 14)
+        #expect(analytics.energyBalance.valueText == "-1,158")
+        #expect(analytics.energyBalance.samples.last?.value == -1_158)
+    }
+
+    @Test func logEntryViewStateIncludesLoggedTime() {
+        let entry = LogEntryViewState(entry: Self.entries[1])
+        let loggedTime = Self.entries[1].loggedAt.formatted(Date.FormatStyle.dateTime.hour().minute())
+
+        #expect(entry.detailText == "\(loggedTime) - 420 g - Homemade")
+    }
+
+    private static let referenceDate = Date(timeIntervalSinceReferenceDate: 172_800)
 
     private static let entries = [
         FoodLogEntry(

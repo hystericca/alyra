@@ -27,6 +27,7 @@ struct DashboardView: View {
     let appTabPadding: CGFloat
     let onPreviousDay: () -> Void
     let onNextDay: () -> Void
+    let onEdit: (UUID) -> Void
     let onDelete: (UUID) -> Void
 
     var body: some View {
@@ -48,7 +49,11 @@ struct DashboardView: View {
                     AnalyticsSection(analytics: snapshot.analytics)
 
                     ForEach(snapshot.sections) { section in
-                        MealSectionView(section: section, onDelete: onDelete)
+                        MealSectionView(
+                            section: section,
+                            onEdit: onEdit,
+                            onDelete: onDelete
+                        )
                     }
                 }
                 .padding(AppTheme.Spacing.screen)
@@ -678,6 +683,7 @@ private struct MealSectionView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let section: MealSectionViewState
+    let onEdit: (UUID) -> Void
     let onDelete: (UUID) -> Void
 
     var body: some View {
@@ -717,7 +723,11 @@ private struct MealSectionView: View {
                             .padding(.leading, 14)
                     }
 
-                    LogFoodRow(entry: entry, onDelete: onDelete)
+                    LogFoodRow(
+                        entry: entry,
+                        onEdit: onEdit,
+                        onDelete: onDelete
+                    )
                         .transition(AppTheme.Motion.rowTransition(reduceMotion: reduceMotion))
                 }
             }
@@ -741,6 +751,7 @@ private struct EmptyMealRow: View {
 
 private struct LogFoodRow: View {
     let entry: LogEntryViewState
+    let onEdit: (UUID) -> Void
     let onDelete: (UUID) -> Void
 
     var body: some View {
@@ -756,8 +767,14 @@ private struct LogFoodRow: View {
                 .foregroundStyle(AppTheme.primaryText)
                 .monospacedDigit()
 
+            Button(action: { onEdit(entry.id) }) {
+                Image(systemName: "pencil.circle.fill")
+            }
+            .alyraGhostIconButtonStyle()
+            .accessibilityLabel(entry.editAccessibilityLabel)
+
             Button(action: { onDelete(entry.id) }) {
-                Image(systemName: "trash")
+                Image(systemName: "trash.circle.fill")
             }
             .alyraGhostIconButtonStyle()
             .accessibilityLabel(entry.deleteAccessibilityLabel)
