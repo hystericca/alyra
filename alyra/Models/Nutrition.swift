@@ -242,7 +242,7 @@ nonisolated enum FoodIconKind: String, CaseIterable, Codable, Equatable, Identif
         case .salad: "leaf"
         case .sandwich: "rectangle.fill"
         case .seafood: "fish"
-        case .soup: "bowl.fill"
+        case .soup: "cup.and.saucer.fill"
         case .sweets: "birthday.cake.fill"
         case .taco: "seal.fill"
         case .tofu: "cube.fill"
