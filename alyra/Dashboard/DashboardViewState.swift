@@ -426,7 +426,7 @@ nonisolated struct LogEntryViewState: Identifiable, Equatable, Sendable {
         let servingText = "\(DashboardNumberText.wholeNumber(entry.servingGrams)) g"
         let foodDetailText = entry.brand.isEmpty ? servingText : "\(servingText) - \(entry.brand)"
         detailText = "\(timeText) - \(foodDetailText)"
-        iconKind = FoodIconKind.guess(for: entry)
+        iconKind = entry.iconKind
         caloriesText = DashboardNumberText.wholeNumber(entry.nutrients.calories)
         editAccessibilityLabel = "Edit \(entry.foodName)"
         deleteAccessibilityLabel = "Delete \(entry.foodName)"
@@ -489,41 +489,23 @@ nonisolated enum DataGradientKind: Equatable, Sendable {
     case generic
 }
 
-nonisolated enum FoodIconKind: Equatable, Sendable {
-    case poultry
-    case yogurt
-    case berries
-    case shake
-    case generic
-
-    var symbolName: String {
-        switch self {
-        case .poultry: "bird.fill"
-        case .yogurt: "cup.and.saucer.fill"
-        case .berries: "circle.grid.2x2.fill"
-        case .shake: "takeoutbag.and.cup.and.straw.fill"
-        case .generic: "fork.knife"
-        }
-    }
-
+nonisolated extension FoodIconKind {
     var gradientKind: DataGradientKind {
         switch self {
+        case .apple, .banana, .fruit:
+            .berries
+        case .avocado, .greens, .salad, .vegetables:
+            .generic
+        case .beans, .bread, .burger, .cheese, .coffee, .eggs, .grains, .milk,
+             .noodles, .nuts, .rice, .sandwich, .soup, .sweets, .taco, .tofu:
+            .generic
+        case .fish, .seafood:
+            .shake
         case .poultry: .poultry
         case .yogurt: .yogurt
         case .berries: .berries
         case .shake: .shake
         case .generic: .generic
         }
-    }
-
-    static func guess(for entry: FoodLogEntry) -> FoodIconKind {
-        let name = entry.foodName.lowercased()
-
-        if name.contains("chicken") { return .poultry }
-        if name.contains("yogurt") { return .yogurt }
-        if name.contains("blueberr") || name.contains("berr") { return .berries }
-        if name.contains("shake") { return .shake }
-
-        return .generic
     }
 }

@@ -5,13 +5,16 @@ struct LogEntryView: View {
     let editingFoodEntry: FoodLogEntry?
     let appTabPadding: CGFloat
     let unitSystem: UnitSystem
+    let foodHistory: [FoodLogEntry]
     let onSaveFood: (FoodLogEntry) -> Void
     let onSaveWeight: (WeightLogEntry) -> Void
 
+    @FocusState private var focusedField: LogInputField?
     @State private var loggedAt: Date
     @State private var entryType = LogEntryType.food
     @State private var foodName = ""
     @State private var brand = ""
+    @State private var foodIconKind = FoodIconKind.generic
     @State private var mealTime = MealTime.breakfast
     @State private var servingGrams = ""
     @State private var calories = ""
@@ -21,12 +24,14 @@ struct LogEntryView: View {
     @State private var fiber = ""
     @State private var weightValue = ""
     @State private var weightNote = ""
+    @State private var quickAddServingGrams: [String: String] = [:]
 
     init(
         date: Date,
         editingFoodEntry: FoodLogEntry? = nil,
         appTabPadding: CGFloat,
         unitSystem: UnitSystem,
+        foodHistory: [FoodLogEntry] = [],
         onSaveFood: @escaping (FoodLogEntry) -> Void,
         onSaveWeight: @escaping (WeightLogEntry) -> Void
     ) {
@@ -34,12 +39,14 @@ struct LogEntryView: View {
         self.editingFoodEntry = editingFoodEntry
         self.appTabPadding = appTabPadding
         self.unitSystem = unitSystem
+        self.foodHistory = foodHistory
         self.onSaveFood = onSaveFood
         self.onSaveWeight = onSaveWeight
         _loggedAt = State(initialValue: editingFoodEntry?.loggedAt ?? date)
         _foodName = State(initialValue: editingFoodEntry?.foodName ?? "")
         _brand = State(initialValue: editingFoodEntry?.brand ?? "")
-        _mealTime = State(initialValue: editingFoodEntry?.mealTime ?? .breakfast)
+        _foodIconKind = State(initialValue: editingFoodEntry?.iconKind ?? .generic)
+        _mealTime = State(initialValue: editingFoodEntry?.mealTime ?? MealTime.defaultFor(date: date))
         _servingGrams = State(
             initialValue: editingFoodEntry.map { DashboardNumberText.wholeNumber($0.servingGrams) } ?? ""
         )
@@ -75,6 +82,7 @@ struct LogEntryView: View {
 
                     switch entryType {
                     case .food:
+                        mealTimeSection
                         foodForm
                         saveButton(
                             title: editingFoodEntry == nil ? "Save food" : "Save changes",
@@ -95,6 +103,16 @@ struct LogEntryView: View {
         }
         .foregroundStyle(AppTheme.primaryText)
         .tint(AppTheme.accent)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+
+                Button("Done") {
+                    focusedField = nil
+                }
+                .font(AppTheme.Typography.bodyStrong)
+            }
+        }
     }
 
     private var header: some View {
@@ -178,15 +196,30 @@ struct LogEntryView: View {
         .alyraInputPanel()
     }
 
+    private var mealTimeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            LogFieldLabel(title: "Meal", symbolName: "fork.knife.circle")
+
+            MealTimePicker(selection: $mealTime)
+        }
+        .alyraInputPanel()
+    }
+
     private var foodForm: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+            if editingFoodEntry == nil, !quickAddTemplates.isEmpty {
+                quickAddSection
+            }
+
             VStack(alignment: .leading, spacing: 16) {
                 LogTextField(
                     title: "Food",
                     symbolName: "fork.knife",
                     placeholder: "Greek yogurt",
                     text: $foodName,
-                    keyboardType: .default
+                    keyboardType: .default,
+                    field: .foodName,
+                    focusedField: $focusedField
                 )
 
                 LogTextField(
@@ -194,14 +227,12 @@ struct LogEntryView: View {
                     symbolName: "tag",
                     placeholder: "Optional",
                     text: $brand,
-                    keyboardType: .default
+                    keyboardType: .default,
+                    field: .brand,
+                    focusedField: $focusedField
                 )
 
-                VStack(alignment: .leading, spacing: 8) {
-                    LogFieldLabel(title: "Meal", symbolName: "fork.knife.circle")
-
-                    MealTimePicker(selection: $mealTime)
-                }
+                FoodIconSelectorView(selection: $foodIconKind)
             }
             .alyraInputPanel()
 
@@ -212,6 +243,8 @@ struct LogEntryView: View {
                     placeholder: "0",
                     text: $servingGrams,
                     keyboardType: .decimalPad,
+                    field: .servingGrams,
+                    focusedField: $focusedField,
                     suffix: "g"
                 )
 
@@ -221,6 +254,8 @@ struct LogEntryView: View {
                     placeholder: "0",
                     text: $calories,
                     keyboardType: .decimalPad,
+                    field: .calories,
+                    focusedField: $focusedField,
                     suffix: "kcal"
                 )
 
@@ -231,6 +266,8 @@ struct LogEntryView: View {
                         placeholder: "0",
                         text: $protein,
                         keyboardType: .decimalPad,
+                        field: .protein,
+                        focusedField: $focusedField,
                         suffix: "g"
                     )
 
@@ -240,6 +277,8 @@ struct LogEntryView: View {
                         placeholder: "0",
                         text: $carbs,
                         keyboardType: .decimalPad,
+                        field: .carbs,
+                        focusedField: $focusedField,
                         suffix: "g"
                     )
                 }
@@ -251,6 +290,8 @@ struct LogEntryView: View {
                         placeholder: "0",
                         text: $fat,
                         keyboardType: .decimalPad,
+                        field: .fat,
+                        focusedField: $focusedField,
                         suffix: "g"
                     )
 
@@ -260,11 +301,58 @@ struct LogEntryView: View {
                         placeholder: "0",
                         text: $fiber,
                         keyboardType: .decimalPad,
+                        field: .fiber,
+                        focusedField: $focusedField,
                         suffix: "g"
                     )
                 }
             }
             .alyraInputPanel()
+        }
+    }
+
+    private var quickAddSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                LogFieldLabel(title: "Quick add", symbolName: "clock.arrow.circlepath")
+
+                Spacer()
+
+                Text(mealTime.rawValue)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.mutedText)
+            }
+
+            VStack(spacing: 0) {
+                ForEach(quickAddTemplates) { template in
+                    if template.id != quickAddTemplates.first?.id {
+                        Divider()
+                            .overlay(AppTheme.separator)
+                    }
+
+                    QuickAddFoodRow(
+                        template: template,
+                        grams: quickAddGramsBinding(for: template),
+                        focusedField: $focusedField,
+                        caloriesText: quickAddCaloriesText(for: template),
+                        action: { quickAdd(template) }
+                    )
+                }
+            }
+            .background(AppTheme.surfaceRaised)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Radius.card,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Radius.card,
+                    style: .continuous
+                )
+                .strokeBorder(AppTheme.strongBorder, lineWidth: AppTheme.Stroke.hairline)
+            }
         }
     }
 
@@ -276,6 +364,8 @@ struct LogEntryView: View {
                 placeholder: "0",
                 text: $weightValue,
                 keyboardType: .decimalPad,
+                field: .weight,
+                focusedField: $focusedField,
                 suffix: unitSystem.weightUnitName
             )
 
@@ -284,10 +374,47 @@ struct LogEntryView: View {
                 symbolName: "note.text",
                 placeholder: "Optional",
                 text: $weightNote,
-                keyboardType: .default
+                keyboardType: .default,
+                field: .weightNote,
+                focusedField: $focusedField
             )
         }
         .alyraInputPanel()
+    }
+
+    private var quickAddTemplates: [FoodQuickAddTemplate] {
+        Nutrition.quickAddTemplates(from: foodHistory, mealTime: mealTime)
+    }
+
+    private func quickAddGramsBinding(for template: FoodQuickAddTemplate) -> Binding<String> {
+        Binding(
+            get: {
+                quickAddServingGrams[template.id]
+                    ?? DashboardNumberText.wholeNumber(template.defaultServingGrams)
+            },
+            set: { value in
+                quickAddServingGrams[template.id] = value
+            }
+        )
+    }
+
+    private func quickAddCaloriesText(for template: FoodQuickAddTemplate) -> String {
+        let grams = quickAddServingGrams[template.id]?.doubleValue ?? template.defaultServingGrams
+        let calories = template.nutrients(for: grams).calories
+        return "\(DashboardNumberText.wholeNumber(calories)) kcal"
+    }
+
+    private func quickAdd(_ template: FoodQuickAddTemplate) {
+        let grams = quickAddServingGrams[template.id]?.doubleValue ?? template.defaultServingGrams
+        guard grams > 0 else { return }
+
+        onSaveFood(
+            template.entry(
+                servingGrams: grams,
+                loggedAt: loggedAt,
+                mealTime: mealTime
+            )
+        )
     }
 
     private func saveButton(
@@ -338,25 +465,57 @@ struct LogEntryView: View {
             return
         }
 
+        let nutrients = NutritionFacts(
+            calories: calories,
+            protein: protein,
+            carbs: carbs,
+            fat: fat,
+            fiber: fiber.doubleValue ?? 0
+        )
+        let foodProfile = foodProfileForSave(
+            nutrients: nutrients,
+            servingGrams: servingGrams
+        )
+
         onSaveFood(
             FoodLogEntry(
                 id: editingFoodEntry?.id ?? UUID(),
                 foodName: foodName.trimmed,
                 brand: brand.trimmed,
+                iconKind: foodIconKind,
+                foodReference: foodProfile.foodReference,
+                foodProfile: foodProfile,
                 mealTime: mealTime,
                 loggedAt: loggedAt,
                 servingGrams: servingGrams,
-                nutrients: NutritionFacts(
-                    calories: calories,
-                    protein: protein,
-                    carbs: carbs,
-                    fat: fat,
-                    fiber: fiber.doubleValue ?? 0
-                )
+                nutrients: nutrients
             )
         )
 
         resetFoodForm()
+    }
+
+    private func foodProfileForSave(
+        nutrients: NutritionFacts,
+        servingGrams: Double
+    ) -> FoodProfileSnapshot {
+        if let editingFoodEntry {
+            return editingFoodEntry.foodProfile.renamedIfNeeded(
+                foodName: foodName.trimmed,
+                brand: brand.trimmed,
+                iconKind: foodIconKind,
+                nutrients: nutrients,
+                servingGrams: servingGrams
+            )
+        }
+
+        return .manual(
+            foodName: foodName.trimmed,
+            brand: brand.trimmed,
+            iconKind: foodIconKind,
+            nutrients: nutrients,
+            servingGrams: servingGrams
+        )
     }
 
     private func saveWeight() {
@@ -380,6 +539,7 @@ struct LogEntryView: View {
     private func resetFoodForm() {
         foodName = ""
         brand = ""
+        foodIconKind = .generic
         servingGrams = ""
         calories = ""
         protein = ""
@@ -394,12 +554,28 @@ struct LogEntryView: View {
     }
 }
 
+private enum LogInputField: Hashable {
+    case foodName
+    case brand
+    case servingGrams
+    case calories
+    case protein
+    case carbs
+    case fat
+    case fiber
+    case quickAddGrams(String)
+    case weight
+    case weightNote
+}
+
 private struct LogTextField: View {
     let title: String
     let symbolName: String
     let placeholder: String
     @Binding var text: String
     let keyboardType: UIKeyboardType
+    let field: LogInputField
+    let focusedField: FocusState<LogInputField?>.Binding
     var suffix: String?
 
     private var autocapitalization: TextInputAutocapitalization {
@@ -420,6 +596,7 @@ private struct LogTextField: View {
                     .font(AppTheme.Typography.body)
                     .foregroundStyle(AppTheme.primaryText)
                     .keyboardType(keyboardType)
+                    .focused(focusedField, equals: field)
                     .textInputAutocapitalization(autocapitalization)
                     .autocorrectionDisabled(keyboardType != .default)
 
@@ -461,6 +638,160 @@ private struct LogFieldLabel: View {
             .textCase(.uppercase)
             .tracking(0.8)
             .labelStyle(.titleAndIcon)
+    }
+}
+
+private struct FoodIconSelectorView: View {
+    @Binding var selection: FoodIconKind
+
+    private static let columns = [
+        GridItem(.adaptive(minimum: 58), spacing: 8),
+    ]
+
+    private static let iconKinds = FoodIconKind.allCases
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center) {
+                LogFieldLabel(title: "Icon", symbolName: "square.grid.2x2")
+
+                Spacer()
+
+                Label(selection.title, systemImage: selection.symbolName)
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.mutedText)
+                    .lineLimit(1)
+            }
+
+            LazyVGrid(columns: Self.columns, spacing: 8) {
+                ForEach(Self.iconKinds) { iconKind in
+                    FoodIconSelectorButton(
+                        iconKind: iconKind,
+                        isSelected: selection == iconKind
+                    ) {
+                        selection = iconKind
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct FoodIconSelectorButton: View, Equatable {
+    let iconKind: FoodIconKind
+    let isSelected: Bool
+    let action: () -> Void
+
+    static func == (lhs: FoodIconSelectorButton, rhs: FoodIconSelectorButton) -> Bool {
+        lhs.iconKind == rhs.iconKind && lhs.isSelected == rhs.isSelected
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: iconKind.symbolName)
+                    .font(.system(size: 17, weight: .medium))
+                    .symbolRenderingMode(.monochrome)
+
+                Text(iconKind.title)
+                    .font(AppTheme.Typography.caption)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(isSelected ? AppTheme.background : AppTheme.primaryText)
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .background(isSelected ? AppTheme.primaryText : AppTheme.surfaceRaised)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Radius.control,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Radius.control,
+                    style: .continuous
+                )
+                .strokeBorder(AppTheme.strongBorder, lineWidth: AppTheme.Stroke.hairline)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(iconKind.title)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+}
+
+private struct QuickAddFoodRow: View {
+    let template: FoodQuickAddTemplate
+    @Binding var grams: String
+    let focusedField: FocusState<LogInputField?>.Binding
+    let caloriesText: String
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: template.iconKind.symbolName)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(AppTheme.primaryText)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(template.foodName)
+                    .font(AppTheme.Typography.bodyStrong)
+                    .foregroundStyle(AppTheme.primaryText)
+                    .lineLimit(1)
+
+                Text("\(template.displayDetail) - \(caloriesText)")
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.mutedText)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 4) {
+                TextField("0", text: $grams)
+                    .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.primaryText)
+                    .keyboardType(.decimalPad)
+                    .focused(focusedField, equals: .quickAddGrams(template.id))
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 48)
+
+                Text("g")
+                    .font(AppTheme.Typography.caption)
+                    .foregroundStyle(AppTheme.mutedText)
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 38)
+            .background(AppTheme.background)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Radius.control,
+                    style: .continuous
+                )
+            )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Radius.control,
+                    style: .continuous
+                )
+                .strokeBorder(AppTheme.strongBorder, lineWidth: AppTheme.Stroke.hairline)
+            }
+
+            Button(action: action) {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.background)
+            .background(AppTheme.primaryText)
+            .clipShape(Circle())
+            .accessibilityLabel("Quick add \(template.foodName)")
+        }
+        .padding(12)
     }
 }
 

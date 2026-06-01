@@ -72,6 +72,7 @@ struct ContentView: View {
             editingFoodEntry: editingFoodEntry,
             appTabPadding: tabContentPadding,
             unitSystem: selectedUnitSystem,
+            foodHistory: entries,
             onSaveFood: addEntry,
             onSaveWeight: addWeightEntry
         )
