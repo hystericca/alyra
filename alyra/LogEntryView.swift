@@ -418,6 +418,7 @@ private struct LogTextField: View {
             HStack(spacing: 8) {
                 TextField(placeholder, text: $text)
                     .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.primaryText)
                     .keyboardType(keyboardType)
                     .textInputAutocapitalization(autocapitalization)
                     .autocorrectionDisabled(keyboardType != .default)
@@ -430,13 +431,20 @@ private struct LogTextField: View {
             }
             .padding(.horizontal, 12)
             .frame(height: 46)
-            .background(AppTheme.controlFill)
+            .background(AppTheme.surfaceRaised)
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: AppTheme.Radius.control,
                     style: .continuous
                 )
             )
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Radius.control,
+                    style: .continuous
+                )
+                .strokeBorder(AppTheme.strongBorder, lineWidth: AppTheme.Stroke.hairline)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -449,7 +457,7 @@ private struct LogFieldLabel: View {
     var body: some View {
         Label(title, systemImage: symbolName)
             .font(AppTheme.Typography.eyebrow)
-            .foregroundStyle(AppTheme.mutedText)
+            .foregroundStyle(AppTheme.primaryText)
             .textCase(.uppercase)
             .tracking(0.8)
             .labelStyle(.titleAndIcon)
@@ -476,47 +484,32 @@ private struct MealTimePicker: View {
                         .minimumScaleFactor(0.82)
                         .frame(maxWidth: .infinity)
                         .frame(height: 42)
-                        .foregroundStyle(selection == meal ? AppTheme.primaryText : AppTheme.mutedText)
-                        .background(selection == meal ? AppTheme.controlFill : .clear)
+                        .foregroundStyle(selection == meal ? AppTheme.background : AppTheme.primaryText)
+                        .background(selection == meal ? AppTheme.primaryText : AppTheme.surfaceRaised)
                         .clipShape(
                             RoundedRectangle(
                                 cornerRadius: AppTheme.Radius.control,
                                 style: .continuous
                             )
                         )
+                        .overlay {
+                            RoundedRectangle(
+                                cornerRadius: AppTheme.Radius.control,
+                                style: .continuous
+                            )
+                            .strokeBorder(AppTheme.strongBorder, lineWidth: AppTheme.Stroke.hairline)
+                        }
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selection == meal ? [.isSelected] : [])
             }
         }
-        .padding(4)
-        .background(AppTheme.controlFill.opacity(0.7))
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: AppTheme.Radius.card,
-                style: .continuous
-            )
-        )
     }
 }
 
 private extension View {
     func alyraInputPanel() -> some View {
-        padding(14)
-            .background(AppTheme.surfaceRaised)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Radius.card,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Radius.card,
-                    style: .continuous
-                )
-                .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
-            }
+        padding(.vertical, 4)
     }
 }
 

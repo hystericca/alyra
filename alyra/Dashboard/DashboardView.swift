@@ -768,18 +768,34 @@ private struct LogFoodRow: View {
                 .monospacedDigit()
 
             Button(action: { onEdit(entry.id) }) {
-                Image(systemName: "pencil.circle.fill")
+                Image(systemName: "pencil")
             }
-            .alyraGhostIconButtonStyle()
+            .buttonStyle(LogRowActionButtonStyle())
             .accessibilityLabel(entry.editAccessibilityLabel)
 
             Button(action: { onDelete(entry.id) }) {
-                Image(systemName: "trash.circle.fill")
+                Image(systemName: "trash")
             }
-            .alyraGhostIconButtonStyle()
+            .buttonStyle(LogRowActionButtonStyle())
             .accessibilityLabel(entry.deleteAccessibilityLabel)
         }
         .padding(.vertical, 12)
+    }
+}
+
+private struct LogRowActionButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 20, weight: .semibold))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(AppTheme.primaryText)
+            .frame(width: AppTheme.Control.minimumHitSize, height: AppTheme.Control.minimumHitSize)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.62 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.94 : 1)
+            .animation(AppTheme.Motion.press(reduceMotion: reduceMotion), value: configuration.isPressed)
     }
 }
 
