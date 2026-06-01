@@ -12,6 +12,8 @@ import SwiftUI
 #endif
 
 enum AppTheme {
+    static let preferredColorScheme: ColorScheme = .dark
+
     enum Spacing {
         static let screen: CGFloat = 18
         static let section: CGFloat = 22
@@ -103,13 +105,23 @@ enum AppTheme {
         static let minimumHitSize: CGFloat = 44
     }
 
-    static let background = Color(light: 0xFAFAF7, dark: 0x050505)
-    static let surface = Color(light: 0xF3F1EC, dark: 0x101010)
-    static let surfaceRaised = Color(light: 0xFCFBF7, dark: 0x151515)
+    static let background = Color(light: 0xFFFFFF, dark: 0x000000)
+    static let surface = Color(light: 0xFFFFFF, dark: 0x000000)
+    static let surfaceRaised = Color(light: 0xFFFFFF, dark: 0x000000)
 
-    static let primaryText = Color(light: 0x080807, dark: 0xF5F2EA)
-    static let secondaryText = Color(light: 0x4F4D48, dark: 0xB7B2A8)
-    static let mutedText = Color(light: 0x8A877F, dark: 0x77736C)
+    static let primaryText = Color(light: 0x000000, dark: 0xFFFFFF)
+    static let secondaryText = Color(
+        light: 0x000000,
+        dark: 0xFFFFFF,
+        lightOpacity: 0.82,
+        darkOpacity: 0.86
+    )
+    static let mutedText = Color(
+        light: 0x000000,
+        dark: 0xFFFFFF,
+        lightOpacity: 0.58,
+        darkOpacity: 0.66
+    )
 
     static let border = Color(
         light: 0x000000,
@@ -139,7 +151,7 @@ enum AppTheme {
         darkOpacity: 0.040
     )
 
-    static let accent = Color(light: 0x080807, dark: 0xF5F2EA)
+    static let accent = Color(light: 0x000000, dark: 0xFFFFFF)
 
     static let tickTrack = Color(
         light: 0x000000,
@@ -215,23 +227,12 @@ enum AppTheme {
         _ kind: DataGradientKind
     ) -> (light: (UInt, UInt), dark: (UInt, UInt)) {
         switch kind {
-        case .energy, .protein, .weight:
-            return ((0x24231F, 0x615D55), (0xF1EDE5, 0xBCB6AC))
-
-        case .carbs, .fat, .expenditure:
-            return ((0x34322E, 0x746F66), (0xE6DFD4, 0xABA49A))
-
-        case .balancePositive:
-            return ((0x292824, 0x5D5951), (0xEEE9DF, 0xB5AEA4))
-
-        case .balanceNegative:
-            return ((0x54514A, 0x858177), (0xCBC4BA, 0x918B81))
-
-        case .poultry, .yogurt, .berries, .shake:
-            return ((0x3B3832, 0x827D73), (0xDAD3C8, 0x9D968B))
-
-        case .generic:
-            return ((0x646059, 0x9A958B), (0xAAA49A, 0xEEE9DF))
+        case .energy, .protein, .weight,
+             .carbs, .fat, .expenditure,
+             .balancePositive, .balanceNegative,
+             .poultry, .yogurt, .berries, .shake,
+             .generic:
+            return ((0x000000, 0x000000), (0xFFFFFF, 0xFFFFFF))
         }
     }
 

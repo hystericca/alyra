@@ -7,10 +7,6 @@
 
 import SwiftUI
 
-#if canImport(UIKit)
-    import UIKit
-#endif
-
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -19,7 +15,6 @@ struct ContentView: View {
     @State private var dateNavigationDirection = DateNavigationDirection.forward
     @State private var entries = FoodLogStore.load()
     @State private var weightEntries = WeightLogStore.load()
-    @State private var isKeyboardVisible = false
     @State private var editingFoodEntry: FoodLogEntry?
     @AppStorage(AppSettingsKeys.dailyCalories) private var dailyCalories = 2_200.0
     @AppStorage(AppSettingsKeys.proteinTarget) private var proteinTarget = 140.0
@@ -28,31 +23,26 @@ struct ContentView: View {
     @AppStorage(AppSettingsKeys.unitSystem) private var unitSystem = UnitSystem.imperial.rawValue
 
     var body: some View {
-        GeometryReader { proxy in
-            let bottomInset = proxy.safeAreaInsets.bottom
-            let appTabPadding = AppTheme.Navigation.contentInset(bottomInset: bottomInset)
+        TabView(selection: $selectedTab) {
+            Tab(AppTab.dashboard.title, systemImage: AppTab.dashboard.symbolName, value: AppTab.dashboard) {
+                dashboardTab
+            }
 
-            ZStack(alignment: .bottom) {
-                selectedContent(appTabPadding: appTabPadding)
+            Tab(AppTab.add.title, systemImage: AppTab.add.symbolName, value: AppTab.add) {
+                addTab
+            }
 
-                AppTabBar(
-                    selectedTab: $selectedTab,
-                    bottomInset: bottomInset
-                )
-                .opacity(isKeyboardVisible ? 0 : 1)
-                .allowsHitTesting(!isKeyboardVisible)
-                .accessibilityHidden(isKeyboardVisible)
-                .zIndex(1)
+            Tab(AppTab.settings.title, systemImage: AppTab.settings.symbolName, value: AppTab.settings) {
+                settingsTab
             }
         }
-        .ignoresSafeArea(.container, edges: .bottom)
+        .tabViewStyle(.tabBarOnly)
+        .tint(AppTheme.primaryText)
+        .toolbarBackground(AppTheme.background, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarColorScheme(AppTheme.preferredColorScheme, for: .tabBar)
         .background(AppTheme.background)
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-            setKeyboardVisible(true)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            setKeyboardVisible(false)
-        }
+        .preferredColorScheme(AppTheme.preferredColorScheme)
         .onChange(of: selectedTab) { _, tab in
             if tab != .add {
                 editingFoodEntry = nil
@@ -60,34 +50,41 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder
-    private func selectedContent(appTabPadding: CGFloat) -> some View {
-        switch selectedTab {
-        case .dashboard:
-            DashboardView(
-                date: dateState,
-                dateNavigationDirection: dateNavigationDirection,
-                snapshot: dashboard,
-                appTabPadding: appTabPadding,
-                onPreviousDay: { moveDate(by: -1) },
-                onNextDay: { moveDate(by: 1) },
-                onEdit: editEntry,
-                onDelete: deleteEntry
-            )
+    private var dashboardTab: some View {
+        DashboardView(
+            date: dateState,
+            dateNavigationDirection: dateNavigationDirection,
+            snapshot: dashboard,
+            appTabPadding: tabContentPadding,
+            onPreviousDay: { moveDate(by: -1) },
+            onNextDay: { moveDate(by: 1) },
+            onEdit: editEntry,
+            onDelete: deleteEntry
+        )
+        .toolbarBackground(AppTheme.background, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarColorScheme(AppTheme.preferredColorScheme, for: .tabBar)
+    }
 
-        case .add:
-            LogEntryView(
-                date: selectedDate,
-                editingFoodEntry: editingFoodEntry,
-                appTabPadding: appTabPadding,
-                unitSystem: selectedUnitSystem,
-                onSaveFood: addEntry,
-                onSaveWeight: addWeightEntry
-            )
+    private var addTab: some View {
+        LogEntryView(
+            date: selectedDate,
+            editingFoodEntry: editingFoodEntry,
+            appTabPadding: tabContentPadding,
+            unitSystem: selectedUnitSystem,
+            onSaveFood: addEntry,
+            onSaveWeight: addWeightEntry
+        )
+        .toolbarBackground(AppTheme.background, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarColorScheme(AppTheme.preferredColorScheme, for: .tabBar)
+    }
 
-        case .settings:
-            SettingsView(appTabPadding: appTabPadding)
-        }
+    private var settingsTab: some View {
+        SettingsView(appTabPadding: tabContentPadding)
+            .toolbarBackground(AppTheme.background, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
+            .toolbarColorScheme(AppTheme.preferredColorScheme, for: .tabBar)
     }
 
     private func moveDate(by days: Int) {
@@ -147,14 +144,12 @@ struct ContentView: View {
         }
     }
 
-    private func setKeyboardVisible(_ isVisible: Bool) {
-        guard isKeyboardVisible != isVisible else { return }
-
-        isKeyboardVisible = isVisible
-    }
-
     private var dateState: DashboardDateState {
         DashboardDateState.from(selectedDate)
+    }
+
+    private var tabContentPadding: CGFloat {
+        AppTheme.Spacing.section
     }
 
     private var dashboard: DashboardSnapshot {
@@ -230,110 +225,6 @@ private enum AppTab: CaseIterable, Hashable, Identifiable {
         case .settings:
             return "slider.horizontal.3"
         }
-    }
-}
-
-private struct AppTabBar: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    @Binding var selectedTab: AppTab
-    let bottomInset: CGFloat
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(AppTab.allCases) { tab in
-                AppTabButton(
-                    tab: tab,
-                    isSelected: selectedTab == tab
-                ) {
-                    select(tab)
-                }
-            }
-        }
-        .padding(AppTheme.Navigation.railInnerPadding)
-        .background(tabBarBackground)
-        .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
-        .padding(.horizontal, AppTheme.Navigation.railHorizontalPadding)
-        .padding(.bottom, AppTheme.Navigation.railBottomPadding + bottomInset)
-        .frame(maxWidth: .infinity)
-        .frame(
-            height: AppTheme.Navigation.railHeight(bottomInset: bottomInset),
-            alignment: .bottom
-        )
-        .accessibilityElement(children: .contain)
-    }
-
-    private func select(_ tab: AppTab) {
-        guard selectedTab != tab else { return }
-
-        withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
-            selectedTab = tab
-        }
-    }
-
-    private var tabBarBackground: some View {
-        RoundedRectangle(
-            cornerRadius: AppTheme.Navigation.railCornerRadius,
-            style: .continuous
-        )
-        .fill(AppTheme.surfaceRaised.opacity(0.96))
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: AppTheme.Navigation.railCornerRadius,
-                style: .continuous
-            )
-            .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
-        }
-    }
-}
-
-private struct AppTabButton: View {
-    let tab: AppTab
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 5) {
-                Image(systemName: tab.symbolName)
-                    .font(.system(size: tab == .add ? 15 : 14, weight: .medium))
-                    .frame(width: 18, height: 17)
-
-                Text(tab.title)
-                    .font(AppTheme.Typography.caption)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
-            }
-            .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.mutedText)
-            .frame(maxWidth: .infinity)
-            .frame(height: AppTheme.Navigation.itemHeight)
-            .background {
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Navigation.itemCornerRadius,
-                    style: .continuous
-                )
-                .fill(isSelected ? AppTheme.controlFill : .clear)
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: AppTheme.Navigation.itemCornerRadius,
-                        style: .continuous
-                    )
-                    .strokeBorder(
-                        isSelected ? AppTheme.border : .clear,
-                        lineWidth: AppTheme.Stroke.hairline
-                    )
-                }
-            }
-            .contentShape(
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Navigation.itemCornerRadius,
-                    style: .continuous
-                )
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(tab.title)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 
