@@ -29,7 +29,7 @@ nonisolated struct DashboardSnapshot: Equatable, Sendable {
     var sections: [MealSectionViewState]
 
     static func from(
-        entries: [LogEntry],
+        entries: [FoodLogEntry],
         targets: DailyTargets = .standard,
         analytics: DashboardAnalyticsViewState
     ) -> DashboardSnapshot {
@@ -145,6 +145,77 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
     var weightTrend: HealthGraphViewState
     var expenditure: HealthGraphViewState
     var energyBalance: HealthGraphViewState
+
+    static let empty = DashboardAnalyticsViewState(
+        weightTrend: HealthGraphViewState(
+            id: "weight",
+            title: "Weight",
+            symbolName: "scalemass",
+            valueText: "--",
+            unitText: "lb",
+            detailText: "No entries yet",
+            style: .lineArea,
+            gradientKind: .weight,
+            negativeGradientKind: nil,
+            values: []
+        ),
+        expenditure: HealthGraphViewState(
+            id: "expenditure",
+            title: "Expenditure",
+            symbolName: "flame",
+            valueText: "--",
+            unitText: "kcal",
+            detailText: "No data",
+            style: .bars,
+            gradientKind: .expenditure,
+            negativeGradientKind: nil,
+            baselineRule: .zero,
+            values: []
+        ),
+        energyBalance: HealthGraphViewState(
+            id: "balance",
+            title: "Energy balance",
+            symbolName: "plus.forwardslash.minus",
+            valueText: "--",
+            unitText: "kcal",
+            detailText: "No data",
+            style: .bars,
+            gradientKind: .balancePositive,
+            negativeGradientKind: .balanceNegative,
+            baselineRule: .zero,
+            values: []
+        )
+    )
+
+    static func from(weightEntries: [WeightLogEntry]) -> DashboardAnalyticsViewState {
+        let sortedEntries = weightEntries.sorted { $0.loggedAt < $1.loggedAt }
+        let recentEntries = Array(sortedEntries.suffix(14))
+        let weights = recentEntries.map(\.weightPounds)
+
+        guard let latestWeight = weights.last else {
+            return .empty
+        }
+
+        let firstWeight = weights.first ?? latestWeight
+        let delta = latestWeight - firstWeight
+        let deltaPrefix = delta > 0 ? "+" : ""
+
+        var analytics = DashboardAnalyticsViewState.empty
+        analytics.weightTrend = HealthGraphViewState(
+            id: "weight",
+            title: "Weight",
+            symbolName: "scalemass",
+            valueText: DashboardNumberText.oneDecimal(latestWeight),
+            unitText: "lb",
+            detailText: "\(deltaPrefix)\(DashboardNumberText.oneDecimal(delta)) lb / \(weights.count)d",
+            style: .lineArea,
+            gradientKind: .weight,
+            negativeGradientKind: nil,
+            values: weights
+        )
+
+        return analytics
+    }
 }
 
 nonisolated enum HealthGraphStyle: Equatable, Sendable {
@@ -268,10 +339,11 @@ nonisolated struct LogEntryViewState: Identifiable, Equatable, Sendable {
     var caloriesText: String
     var deleteAccessibilityLabel: String
 
-    init(entry: LogEntry) {
+    init(entry: FoodLogEntry) {
         id = entry.id
         foodName = entry.foodName
-        detailText = "\(DashboardNumberText.wholeNumber(entry.servingGrams)) g - \(entry.brand)"
+        let servingText = "\(DashboardNumberText.wholeNumber(entry.servingGrams)) g"
+        detailText = entry.brand.isEmpty ? servingText : "\(servingText) - \(entry.brand)"
         iconKind = FoodIconKind.guess(for: entry)
         caloriesText = DashboardNumberText.wholeNumber(entry.nutrients.calories)
         deleteAccessibilityLabel = "Delete \(entry.foodName)"
@@ -285,6 +357,10 @@ nonisolated enum DashboardNumberText {
 
     static func wholeNumber(_ value: Double) -> String {
         value.formatted(wholeNumberStyle)
+    }
+
+    static func oneDecimal(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(1)))
     }
 
     static func progress(value: Double, target: Double) -> Double {
@@ -347,7 +423,7 @@ nonisolated enum FoodIconKind: Equatable, Sendable {
         }
     }
 
-    static func guess(for entry: LogEntry) -> FoodIconKind {
+    static func guess(for entry: FoodLogEntry) -> FoodIconKind {
         let name = entry.foodName.lowercased()
 
         if name.contains("chicken") { return .poultry }

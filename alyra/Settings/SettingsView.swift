@@ -1,14 +1,28 @@
-//
-//  SettingsView.swift
-//  alyra
-//
-//  Created by Viktor Luna on 5/30/26.
-//
-
 import SwiftUI
+
+enum AppSettingsKeys {
+    static let dailyCalories = "alyra.settings.dailyCalories"
+    static let proteinTarget = "alyra.settings.proteinTarget"
+    static let carbsTarget = "alyra.settings.carbsTarget"
+    static let fatTarget = "alyra.settings.fatTarget"
+    static let unitSystem = "alyra.settings.unitSystem"
+}
+
+private enum UnitSystem: String, CaseIterable, Identifiable {
+    case imperial = "Imperial"
+    case metric = "Metric"
+
+    var id: String { rawValue }
+}
 
 struct SettingsView: View {
     let appTabPadding: CGFloat
+
+    @AppStorage(AppSettingsKeys.dailyCalories) private var dailyCalories = 2_200.0
+    @AppStorage(AppSettingsKeys.proteinTarget) private var proteinTarget = 140.0
+    @AppStorage(AppSettingsKeys.carbsTarget) private var carbsTarget = 250.0
+    @AppStorage(AppSettingsKeys.fatTarget) private var fatTarget = 70.0
+    @AppStorage(AppSettingsKeys.unitSystem) private var unitSystem = UnitSystem.imperial.rawValue
 
     var body: some View {
         ZStack {
@@ -20,45 +34,51 @@ struct SettingsView: View {
                     header
 
                     SettingsSection(title: "Goals") {
-                        SettingsRow(
+                        GoalStepperRow(
                             title: "Daily calories",
-                            value: "2,200 kcal",
+                            value: $dailyCalories,
+                            range: 1_000...5_000,
+                            step: 50,
+                            unit: "kcal",
                             symbolName: "flame.fill"
                         )
 
-                        SettingsRow(
+                        SettingsDivider()
+
+                        GoalStepperRow(
                             title: "Protein target",
-                            value: "140 g",
+                            value: $proteinTarget,
+                            range: 40...300,
+                            step: 5,
+                            unit: "g",
                             symbolName: "dumbbell.fill"
+                        )
+
+                        SettingsDivider()
+
+                        GoalStepperRow(
+                            title: "Carbs target",
+                            value: $carbsTarget,
+                            range: 40...500,
+                            step: 5,
+                            unit: "g",
+                            symbolName: "bolt.fill"
+                        )
+
+                        SettingsDivider()
+
+                        GoalStepperRow(
+                            title: "Fat target",
+                            value: $fatTarget,
+                            range: 20...200,
+                            step: 5,
+                            unit: "g",
+                            symbolName: "drop.fill"
                         )
                     }
 
                     SettingsSection(title: "Preferences") {
-                        SettingsRow(
-                            title: "Units",
-                            value: "Imperial",
-                            symbolName: "ruler"
-                        )
-
-                        SettingsRow(
-                            title: "Reduce motion",
-                            value: "System",
-                            symbolName: "circle.lefthalf.filled"
-                        )
-                    }
-
-                    SettingsSection(title: "Data") {
-                        SettingsRow(
-                            title: "Food database",
-                            value: "Demo",
-                            symbolName: "tray.full"
-                        )
-
-                        SettingsRow(
-                            title: "Health sync",
-                            value: "Off",
-                            symbolName: "heart.text.square"
-                        )
+                        UnitPickerRow(selection: $unitSystem)
                     }
                 }
                 .padding(AppTheme.Spacing.screen)
@@ -76,7 +96,7 @@ struct SettingsView: View {
                 .font(AppTheme.Typography.header)
                 .foregroundStyle(AppTheme.primaryText)
 
-            Text("Manage goals, preferences, and app data.")
+            Text("Set the daily goals used by your dashboard.")
                 .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.secondaryText)
         }
@@ -117,7 +137,51 @@ private struct SettingsSection<Content: View>: View {
     }
 }
 
-private struct SettingsRow: View {
+private struct GoalStepperRow: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let unit: String
+    let symbolName: String
+
+    var body: some View {
+        Stepper(value: $value, in: range, step: step) {
+            SettingsValueLabel(
+                title: title,
+                value: "\(DashboardNumberText.wholeNumber(value)) \(unit)",
+                symbolName: symbolName
+            )
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+    }
+}
+
+private struct UnitPickerRow: View {
+    @Binding var selection: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsValueLabel(
+                title: "Units",
+                value: selection,
+                symbolName: "ruler"
+            )
+
+            Picker("Units", selection: $selection) {
+                ForEach(UnitSystem.allCases) { system in
+                    Text(system.rawValue).tag(system.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+    }
+}
+
+private struct SettingsValueLabel: View {
     let title: String
     let value: String
     let symbolName: String
@@ -139,16 +203,19 @@ private struct SettingsRow: View {
                 .font(AppTheme.Typography.body)
                 .foregroundStyle(AppTheme.mutedText)
                 .lineLimit(1)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(AppTheme.mutedText)
+                .monospacedDigit()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 13)
-        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title), \(value)")
+    }
+}
+
+private struct SettingsDivider: View {
+    var body: some View {
+        Rectangle()
+            .fill(AppTheme.separator)
+            .frame(height: AppTheme.Stroke.hairline)
+            .padding(.leading, 48)
     }
 }
 

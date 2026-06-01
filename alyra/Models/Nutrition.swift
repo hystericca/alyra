@@ -7,7 +7,7 @@
 
 import Foundation
 
-nonisolated enum MealTime: String, CaseIterable, Identifiable, Sendable {
+nonisolated enum MealTime: String, CaseIterable, Codable, Identifiable, Sendable {
     case breakfast = "Breakfast"
     case lunch = "Lunch"
     case dinner = "Dinner"
@@ -16,7 +16,21 @@ nonisolated enum MealTime: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
-nonisolated struct NutritionFacts: Equatable, Sendable {
+nonisolated enum LogEntryType: String, CaseIterable, Codable, Identifiable, Sendable {
+    case food = "Food"
+    case weight = "Weight"
+
+    var id: String { rawValue }
+
+    var symbolName: String {
+        switch self {
+        case .food: "fork.knife"
+        case .weight: "scalemass"
+        }
+    }
+}
+
+nonisolated struct NutritionFacts: Codable, Equatable, Sendable {
     var calories: Double
     var protein: Double
     var carbs: Double
@@ -42,7 +56,7 @@ nonisolated struct NutritionFacts: Equatable, Sendable {
     }
 }
 
-nonisolated struct DailyTargets: Equatable, Sendable {
+nonisolated struct DailyTargets: Codable, Equatable, Sendable {
     var calories: Double
     var protein: Double
     var carbs: Double
@@ -56,7 +70,7 @@ nonisolated struct DailyTargets: Equatable, Sendable {
     )
 }
 
-nonisolated struct NutritionSummary: Equatable, Sendable {
+nonisolated struct NutritionSummary: Codable, Equatable, Sendable {
     var consumed: NutritionFacts
     var targets: DailyTargets
 
@@ -70,7 +84,7 @@ nonisolated struct NutritionSummary: Equatable, Sendable {
     }
 }
 
-nonisolated struct LogEntry: Identifiable, Equatable, Sendable {
+nonisolated struct FoodLogEntry: Codable, Identifiable, Equatable, Sendable {
     var id: UUID
     var foodName: String
     var brand: String
@@ -80,16 +94,23 @@ nonisolated struct LogEntry: Identifiable, Equatable, Sendable {
     var nutrients: NutritionFacts
 }
 
+nonisolated struct WeightLogEntry: Codable, Identifiable, Equatable, Sendable {
+    var id: UUID
+    var loggedAt: Date
+    var weightPounds: Double
+    var note: String
+}
+
 nonisolated struct MealSection: Identifiable, Equatable, Sendable {
     var id: MealTime { mealTime }
 
     var mealTime: MealTime
-    var entries: [LogEntry]
+    var entries: [FoodLogEntry]
     var total: NutritionFacts
 }
 
 nonisolated enum Nutrition {
-    static func sections(from entries: [LogEntry]) -> [MealSection] {
+    static func sections(from entries: [FoodLogEntry]) -> [MealSection] {
         let entriesByMealTime = Dictionary(grouping: entries, by: \.mealTime)
 
         return MealTime.allCases.map { mealTime in
@@ -104,12 +125,62 @@ nonisolated enum Nutrition {
     }
 
     static func summary(
-        from entries: [LogEntry],
+        from entries: [FoodLogEntry],
         targets: DailyTargets = .standard
     ) -> NutritionSummary {
         NutritionSummary(
             consumed: entries.reduce(.zero) { $0 + $1.nutrients },
             targets: targets
         )
+    }
+}
+
+enum FoodLogStore {
+    private static let storageKey = "alyra.nutrition.logEntries"
+
+    static func load() -> [FoodLogEntry] {
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+            return []
+        }
+
+        do {
+            return try JSONDecoder().decode([FoodLogEntry].self, from: data)
+        } catch {
+            return []
+        }
+    }
+
+    static func save(_ entries: [FoodLogEntry]) {
+        do {
+            let data = try JSONEncoder().encode(entries)
+            UserDefaults.standard.set(data, forKey: storageKey)
+        } catch {
+            assertionFailure("Failed to save nutrition log entries: \(error)")
+        }
+    }
+}
+
+enum WeightLogStore {
+    private static let storageKey = "alyra.weight.logEntries"
+
+    static func load() -> [WeightLogEntry] {
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
+            return []
+        }
+
+        do {
+            return try JSONDecoder().decode([WeightLogEntry].self, from: data)
+        } catch {
+            return []
+        }
+    }
+
+    static func save(_ entries: [WeightLogEntry]) {
+        do {
+            let data = try JSONEncoder().encode(entries)
+            UserDefaults.standard.set(data, forKey: storageKey)
+        } catch {
+            assertionFailure("Failed to save weight log entries: \(error)")
+        }
     }
 }

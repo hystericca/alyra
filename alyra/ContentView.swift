@@ -13,7 +13,12 @@ struct ContentView: View {
     @State private var selectedTab = AppTab.dashboard
     @State private var selectedDate = Date.now
     @State private var dateNavigationDirection = DateNavigationDirection.forward
-    @State private var entries = DashboardDemoData.entries
+    @State private var entries = FoodLogStore.load()
+    @State private var weightEntries = WeightLogStore.load()
+    @AppStorage(AppSettingsKeys.dailyCalories) private var dailyCalories = 2_200.0
+    @AppStorage(AppSettingsKeys.proteinTarget) private var proteinTarget = 140.0
+    @AppStorage(AppSettingsKeys.carbsTarget) private var carbsTarget = 250.0
+    @AppStorage(AppSettingsKeys.fatTarget) private var fatTarget = 70.0
 
     var body: some View {
         GeometryReader { proxy in
@@ -49,11 +54,11 @@ struct ContentView: View {
             )
 
         case .add:
-            PlaceholderTabView(
-                title: "Add",
-                subtitle: "Food entry flow goes here.",
-                symbolName: "plus",
-                appTabPadding: appTabPadding
+            LogEntryView(
+                date: selectedDate,
+                appTabPadding: appTabPadding,
+                onSaveFood: addEntry,
+                onSaveWeight: addWeightEntry
             )
 
         case .settings:
@@ -79,6 +84,23 @@ struct ContentView: View {
     private func deleteEntry(id: UUID) {
         withAnimation(AppTheme.Motion.delete(reduceMotion: reduceMotion)) {
             entries.removeAll { $0.id == id }
+            FoodLogStore.save(entries)
+        }
+    }
+
+    private func addEntry(_ entry: FoodLogEntry) {
+        withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
+            entries.append(entry)
+            FoodLogStore.save(entries)
+            selectedTab = .dashboard
+        }
+    }
+
+    private func addWeightEntry(_ entry: WeightLogEntry) {
+        withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
+            weightEntries.append(entry)
+            WeightLogStore.save(weightEntries)
+            selectedTab = .dashboard
         }
     }
 
@@ -88,9 +110,31 @@ struct ContentView: View {
 
     private var dashboard: DashboardSnapshot {
         DashboardSnapshot.from(
-            entries: entries,
-            analytics: DashboardDemoData.analytics
+            entries: entriesForSelectedDate,
+            targets: targets,
+            analytics: DashboardAnalyticsViewState.from(weightEntries: weightEntriesForTrend)
         )
+    }
+
+    private var targets: DailyTargets {
+        DailyTargets(
+            calories: dailyCalories,
+            protein: proteinTarget,
+            carbs: carbsTarget,
+            fat: fatTarget
+        )
+    }
+
+    private var entriesForSelectedDate: [FoodLogEntry] {
+        entries
+            .filter { Calendar.current.isDate($0.loggedAt, inSameDayAs: selectedDate) }
+            .sorted { $0.loggedAt < $1.loggedAt }
+    }
+
+    private var weightEntriesForTrend: [WeightLogEntry] {
+        weightEntries
+            .filter { $0.loggedAt <= selectedDate || Calendar.current.isDate($0.loggedAt, inSameDayAs: selectedDate) }
+            .sorted { $0.loggedAt < $1.loggedAt }
     }
 }
 
@@ -131,7 +175,7 @@ private struct AppTabBar: View {
     let bottomInset: CGFloat
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 4) {
             ForEach(AppTab.allCases) { tab in
                 AppTabButton(
                     tab: tab,
@@ -142,13 +186,15 @@ private struct AppTabBar: View {
             }
         }
         .padding(AppTheme.Navigation.railInnerPadding)
-        .frame(height: AppTheme.Navigation.itemHeight + AppTheme.Navigation.railInnerPadding * 2)
         .background(tabBarBackground)
-        .shadow(color: .black.opacity(0.08), radius: 10, x: 0, y: 4)
+        .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
         .padding(.horizontal, AppTheme.Navigation.railHorizontalPadding)
         .padding(.bottom, AppTheme.Navigation.railBottomPadding + bottomInset)
         .frame(maxWidth: .infinity)
-        .frame(height: AppTheme.Navigation.railHeight(bottomInset: bottomInset), alignment: .bottom)
+        .frame(
+            height: AppTheme.Navigation.railHeight(bottomInset: bottomInset),
+            alignment: .bottom
+        )
         .accessibilityElement(children: .contain)
     }
 
@@ -165,16 +211,7 @@ private struct AppTabBar: View {
             cornerRadius: AppTheme.Navigation.railCornerRadius,
             style: .continuous
         )
-        .fill(
-            LinearGradient(
-                colors: [
-                    AppTheme.surface.opacity(0.98),
-                    AppTheme.surfaceRaised.opacity(0.92),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .fill(AppTheme.surfaceRaised.opacity(0.96))
         .overlay {
             RoundedRectangle(
                 cornerRadius: AppTheme.Navigation.railCornerRadius,
@@ -192,10 +229,10 @@ private struct AppTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            VStack(spacing: 5) {
                 Image(systemName: tab.symbolName)
-                    .font(.system(size: tab == .add ? 14 : 13, weight: .medium))
-                    .frame(width: 16, height: 16)
+                    .font(.system(size: tab == .add ? 15 : 14, weight: .medium))
+                    .frame(width: 18, height: 17)
 
                 Text(tab.title)
                     .font(AppTheme.Typography.caption)
@@ -205,7 +242,23 @@ private struct AppTabButton: View {
             .foregroundStyle(isSelected ? AppTheme.primaryText : AppTheme.mutedText)
             .frame(maxWidth: .infinity)
             .frame(height: AppTheme.Navigation.itemHeight)
-            .background(selectionBackground)
+            .background {
+                RoundedRectangle(
+                    cornerRadius: AppTheme.Navigation.itemCornerRadius,
+                    style: .continuous
+                )
+                .fill(isSelected ? AppTheme.controlFill : .clear)
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: AppTheme.Navigation.itemCornerRadius,
+                        style: .continuous
+                    )
+                    .strokeBorder(
+                        isSelected ? AppTheme.border : .clear,
+                        lineWidth: AppTheme.Stroke.hairline
+                    )
+                }
+            }
             .contentShape(
                 RoundedRectangle(
                     cornerRadius: AppTheme.Navigation.itemCornerRadius,
@@ -216,57 +269,6 @@ private struct AppTabButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-
-    @ViewBuilder
-    private var selectionBackground: some View {
-        if isSelected {
-            RoundedRectangle(
-                cornerRadius: AppTheme.Navigation.itemCornerRadius,
-                style: .continuous
-            )
-            .fill(AppTheme.surfaceRaised)
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Navigation.itemCornerRadius,
-                    style: .continuous
-                )
-                .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
-            }
-            .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 1)
-        }
-    }
-}
-
-private struct PlaceholderTabView: View {
-    let title: String
-    let subtitle: String
-    let symbolName: String
-    let appTabPadding: CGFloat
-
-    var body: some View {
-        ZStack {
-            AppTheme.background
-                .ignoresSafeArea()
-
-            VStack(spacing: 12) {
-                Image(systemName: symbolName)
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundStyle(AppTheme.secondaryText)
-
-                Text(title)
-                    .font(AppTheme.Typography.header)
-                    .foregroundStyle(AppTheme.primaryText)
-
-                Text(subtitle)
-                    .font(AppTheme.Typography.body)
-                    .foregroundStyle(AppTheme.mutedText)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(AppTheme.Spacing.screen)
-            .padding(.bottom, appTabPadding)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
     }
 }
 
