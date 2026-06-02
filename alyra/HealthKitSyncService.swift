@@ -37,24 +37,6 @@ enum HealthKitSyncAvailability: Equatable {
     }
 }
 
-nonisolated struct HealthKitWeightImportResult: Equatable, Sendable {
-    var scanned: Int
-    var inserted: Int
-    var updated: Int
-
-    var summary: String {
-        if scanned == 0 {
-            return "No readable Apple Health weight samples were found. Apple may be hiding data if read access is off."
-        }
-
-        if inserted == 0 && updated == 0 {
-            return "Scanned \(scanned) Apple Health weight samples. Alyra already had them."
-        }
-
-        return "Imported \(inserted) and updated \(updated) of \(scanned) Apple Health weight samples."
-    }
-}
-
 enum HealthKitSyncService {
     static var availability: HealthKitSyncAvailability {
         #if canImport(HealthKit)
@@ -114,40 +96,40 @@ enum HealthKitSyncService {
         #endif
     }
 
-    static func importWeights(startDate: Date, endDate: Date) async throws -> [WeightLogEntry] {
+    static func importWeights(from start: Date, to end: Date) async throws -> [WeightLogEntry] {
         #if canImport(HealthKit)
             guard
                 HKHealthStore.isHealthDataAvailable(),
-                let bodyMassType = HKQuantityType.quantityType(forIdentifier: .bodyMass)
+                let type = HKQuantityType.quantityType(forIdentifier: .bodyMass)
             else {
                 return []
             }
 
             let store = HKHealthStore()
             let predicate = HKQuery.predicateForSamples(
-                withStart: startDate,
-                end: endDate,
+                withStart: start,
+                end: end,
                 options: []
             )
 
             return try await withCheckedThrowingContinuation { continuation in
-                let sortDescriptor = NSSortDescriptor(
+                let sort = NSSortDescriptor(
                     key: HKSampleSortIdentifierEndDate,
                     ascending: true
                 )
 
                 let query = HKSampleQuery(
-                    sampleType: bodyMassType,
+                    sampleType: type,
                     predicate: predicate,
                     limit: HKObjectQueryNoLimit,
-                    sortDescriptors: [sortDescriptor]
+                    sortDescriptors: [sort]
                 ) { _, samples, error in
                     if let error {
                         continuation.resume(throwing: error)
                         return
                     }
 
-                    let entries = (samples as? [HKQuantitySample] ?? []).map { sample in
+                    let logs = (samples as? [HKQuantitySample] ?? []).map { sample in
                         WeightLogEntry(
                             id: sample.uuid,
                             loggedAt: sample.endDate,
@@ -157,7 +139,7 @@ enum HealthKitSyncService {
                         )
                     }
 
-                    continuation.resume(returning: entries)
+                    continuation.resume(returning: logs)
                 }
 
                 store.execute(query)

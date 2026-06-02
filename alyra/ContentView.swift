@@ -233,46 +233,32 @@ struct ContentView: View {
         }
     }
 
-    private func importWeightsFromHealth() async throws -> HealthKitWeightImportResult {
-        let endDate = Date.now
-        let startDate = Calendar.current.date(
+    private func importWeightsFromHealth() async throws -> WeightImportResult {
+        try await HealthKitSyncService.requestAuthorization(scopes: [.weight])
+
+        let end = Date.now
+        let start = Calendar.current.date(
             byAdding: .year,
             value: -5,
-            to: endDate
+            to: end
         ) ?? .distantPast
 
-        let importedEntries = try await HealthKitSyncService.importWeights(
-            startDate: startDate,
-            endDate: endDate
+        let logs = try await HealthKitSyncService.importWeights(
+            from: start,
+            to: end
         )
 
-        var inserted = 0
-        var updated = 0
+        var result = WeightImportResult(scanned: 0, inserted: 0, updated: 0)
 
         withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
-            for importedEntry in importedEntries {
-                if let index = weightEntries.firstIndex(where: { existingEntry in
-                    existingEntry.reference.source == .appleHealth &&
-                    existingEntry.reference.externalID == importedEntry.reference.externalID
-                }) {
-                    weightEntries[index] = importedEntry
-                    updated += 1
-                } else {
-                    weightEntries.append(importedEntry)
-                    inserted += 1
-                }
-            }
+            result = WeightLogMerge.merge(logs, into: &weightEntries)
 
-            if inserted > 0 || updated > 0 {
+            if result.inserted > 0 || result.updated > 0 {
                 WeightLogStore.save(weightEntries)
             }
         }
 
-        return HealthKitWeightImportResult(
-            scanned: importedEntries.count,
-            inserted: inserted,
-            updated: updated
-        )
+        return result
     }
 
     private var dateState: DashboardDateState {

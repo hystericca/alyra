@@ -12,8 +12,8 @@ enum AppSettingsKeys {
 
 struct SettingsView: View {
     let appTabPadding: CGFloat
-    var onImportAppleHealthWeights: () async throws -> HealthKitWeightImportResult = {
-        HealthKitWeightImportResult(scanned: 0, inserted: 0, updated: 0)
+    var onImportAppleHealthWeights: () async throws -> WeightImportResult = {
+        WeightImportResult(scanned: 0, inserted: 0, updated: 0)
     }
 
     @AppStorage(AppSettingsKeys.dailyCalories) private var dailyCalories = 2_200.0
@@ -24,7 +24,7 @@ struct SettingsView: View {
     @AppStorage(AppSettingsKeys.healthKitNutritionWrite) private var healthKitNutritionWrite = false
     @AppStorage(AppSettingsKeys.healthKitWeightWrite) private var healthKitWeightWrite = false
     @State private var healthKitStatusMessage = HealthKitSyncService.availability.message
-    @State private var weightImportMessage = "Import body mass samples that Apple Health allows Alyra to read."
+    @State private var importMessage = "Import body mass samples that Apple Health allows Alyra to read."
     @State private var isImportingWeights = false
 
     var body: some View {
@@ -113,7 +113,7 @@ struct SettingsView: View {
 
                         HealthKitImportRow(
                             title: "Import Apple Health weight",
-                            detail: weightImportMessage,
+                            detail: importMessage,
                             symbolName: "square.and.arrow.down",
                             isImporting: isImportingWeights,
                             isAvailable: HealthKitSyncService.availability.isAvailable,
@@ -155,12 +155,12 @@ struct SettingsView: View {
                 let result = try await onImportAppleHealthWeights()
 
                 await MainActor.run {
-                    weightImportMessage = result.summary
+                    importMessage = result.summary
                     isImportingWeights = false
                 }
             } catch {
                 await MainActor.run {
-                    weightImportMessage = "Import failed. Confirm read access in Apple Health, then try again."
+                    importMessage = "Import failed. Confirm read access in Apple Health, then try again."
                     isImportingWeights = false
                 }
             }
