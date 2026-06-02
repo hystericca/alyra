@@ -34,6 +34,7 @@ enum AppTheme {
 
     enum Stroke {
         static let hairline: CGFloat = 0.5
+        static let panel: CGFloat = 1.0
     }
 
     enum Typography {

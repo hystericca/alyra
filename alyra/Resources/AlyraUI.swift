@@ -83,7 +83,7 @@ private struct AlyraPanelModifier: ViewModifier {
                     cornerRadius: AppTheme.Radius.card,
                     style: .continuous
                 )
-                .strokeBorder(border.color, lineWidth: AppTheme.Stroke.hairline)
+                .strokeBorder(border.color, lineWidth: AppTheme.Stroke.panel)
             }
     }
 }

@@ -352,6 +352,8 @@ private struct WeightEditorTextField: View {
             HStack(spacing: 8) {
                 TextField("Optional", text: $text)
                     .font(AppTheme.Typography.body)
+                    .foregroundStyle(AppTheme.primaryText)
+                    .textFieldStyle(.plain)
                     .keyboardType(field == .weight ? .decimalPad : .default)
                     .focused(focusedField, equals: field)
                     .textInputAutocapitalization(field == .note ? .sentences : .never)
