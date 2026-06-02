@@ -37,6 +37,24 @@ enum HealthKitSyncAvailability: Equatable {
     }
 }
 
+nonisolated struct HealthKitWeightImportResult: Equatable, Sendable {
+    var scanned: Int
+    var inserted: Int
+    var updated: Int
+
+    var summary: String {
+        if scanned == 0 {
+            return "No readable Apple Health weight samples were found. Apple may be hiding data if read access is off."
+        }
+
+        if inserted == 0 && updated == 0 {
+            return "Scanned \(scanned) Apple Health weight samples. Alyra already had them."
+        }
+
+        return "Imported \(inserted) and updated \(updated) of \(scanned) Apple Health weight samples."
+    }
+}
+
 enum HealthKitSyncService {
     static var availability: HealthKitSyncAvailability {
         #if canImport(HealthKit)
@@ -77,19 +95,115 @@ enum HealthKitSyncService {
                 metadata: metadata(sourceID: entry.id.uuidString)
             )
 
-            try? await HKHealthStore().save(sample)
+            let store = HKHealthStore()
+            await deleteExistingSample(type: bodyMassType, sourceID: entry.id.uuidString, store: store)
+            try? await store.save(sample)
+        #endif
+    }
+
+    static func deleteWeight(_ entry: WeightLogEntry) async {
+        #if canImport(HealthKit)
+            guard
+                HKHealthStore.isHealthDataAvailable(),
+                let bodyMassType = HKQuantityType.quantityType(forIdentifier: .bodyMass)
+            else {
+                return
+            }
+
+            await deleteExistingSample(type: bodyMassType, sourceID: entry.id.uuidString, store: HKHealthStore())
+        #endif
+    }
+
+    static func importWeights(startDate: Date, endDate: Date) async throws -> [WeightLogEntry] {
+        #if canImport(HealthKit)
+            guard
+                HKHealthStore.isHealthDataAvailable(),
+                let bodyMassType = HKQuantityType.quantityType(forIdentifier: .bodyMass)
+            else {
+                return []
+            }
+
+            let store = HKHealthStore()
+            let predicate = HKQuery.predicateForSamples(
+                withStart: startDate,
+                end: endDate,
+                options: []
+            )
+
+            return try await withCheckedThrowingContinuation { continuation in
+                let sortDescriptor = NSSortDescriptor(
+                    key: HKSampleSortIdentifierEndDate,
+                    ascending: true
+                )
+
+                let query = HKSampleQuery(
+                    sampleType: bodyMassType,
+                    predicate: predicate,
+                    limit: HKObjectQueryNoLimit,
+                    sortDescriptors: [sortDescriptor]
+                ) { _, samples, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+
+                    let entries = (samples as? [HKQuantitySample] ?? []).map { sample in
+                        WeightLogEntry(
+                            id: sample.uuid,
+                            loggedAt: sample.endDate,
+                            weightKilograms: sample.quantity.doubleValue(for: .gramUnit(with: .kilo)),
+                            note: "Imported from Apple Health",
+                            reference: .appleHealth(sampleID: sample.uuid.uuidString)
+                        )
+                    }
+
+                    continuation.resume(returning: entries)
+                }
+
+                store.execute(query)
+            }
+        #else
+            return []
         #endif
     }
 
     static func saveFood(_ entry: FoodLogEntry) async {
         #if canImport(HealthKit)
-            guard HKHealthStore.isHealthDataAvailable() else { return }
+            guard
+                HKHealthStore.isHealthDataAvailable(),
+                let foodType = HKObjectType.correlationType(forIdentifier: .food)
+            else {
+                return
+            }
 
             let store = HKHealthStore()
             let samples = nutritionSamples(for: entry, store: store)
             guard !samples.isEmpty else { return }
 
-            try? await store.save(samples)
+            await deleteExistingFoodObjects(for: entry, foodType: foodType, store: store)
+
+            let correlation = HKCorrelation(
+                type: foodType,
+                start: entry.loggedAt,
+                end: entry.loggedAt,
+                objects: Set(samples),
+                metadata: metadata(sourceID: foodSourceID(entry), foodName: entry.foodName)
+            )
+
+            try? await store.save(correlation)
+        #endif
+    }
+
+    static func deleteFood(_ entry: FoodLogEntry) async {
+        #if canImport(HealthKit)
+            guard
+                HKHealthStore.isHealthDataAvailable(),
+                let foodType = HKObjectType.correlationType(forIdentifier: .food)
+            else {
+                return
+            }
+
+            await deleteExistingFoodObjects(for: entry, foodType: foodType, store: HKHealthStore())
         #endif
     }
 }
@@ -189,11 +303,58 @@ private extension HealthKitSyncService {
             quantity: quantity,
             start: entry.loggedAt,
             end: entry.loggedAt,
-            metadata: metadata(
-                sourceID: "\(entry.id.uuidString).\(identifier.rawValue)",
-                foodName: entry.foodName
-            )
+            metadata: metadata(sourceID: nutritionSourceID(entry: entry, identifier: identifier))
         )
+    }
+
+    static func deleteExistingFoodObjects(
+        for entry: FoodLogEntry,
+        foodType: HKCorrelationType,
+        store: HKHealthStore
+    ) async {
+        await deleteExistingSample(
+            type: foodType,
+            sourceID: foodSourceID(entry),
+            store: store
+        )
+        await deleteExistingNutritionSamples(for: entry, store: store)
+    }
+
+    static func deleteExistingNutritionSamples(for entry: FoodLogEntry, store: HKHealthStore) async {
+        for identifier in nutritionIdentifiers {
+            guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else { continue }
+            await deleteExistingSample(
+                type: type,
+                sourceID: nutritionSourceID(entry: entry, identifier: identifier),
+                store: store
+            )
+        }
+    }
+
+    static func foodSourceID(_ entry: FoodLogEntry) -> String {
+        entry.id.uuidString
+    }
+
+    static func nutritionSourceID(
+        entry: FoodLogEntry,
+        identifier: HKQuantityTypeIdentifier
+    ) -> String {
+        "\(entry.id.uuidString).\(identifier.rawValue)"
+    }
+
+    static func deleteExistingSample(
+        type: HKObjectType,
+        sourceID: String,
+        store: HKHealthStore
+    ) async {
+        let predicate = NSPredicate(
+            format: "%K.%K == %@",
+            HKPredicateKeyPathMetadata,
+            HKMetadataKeyExternalUUID,
+            sourceID
+        )
+
+        _ = try? await store.deleteObjects(of: type, predicate: predicate)
     }
 
     static func metadata(sourceID: String, foodName: String? = nil) -> [String: Any] {

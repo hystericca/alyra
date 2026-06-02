@@ -23,6 +23,8 @@ struct ContentView: View {
     @AppStorage(AppSettingsKeys.carbsTarget) private var carbsTarget = 250.0
     @AppStorage(AppSettingsKeys.fatTarget) private var fatTarget = 70.0
     @AppStorage(AppSettingsKeys.unitSystem) private var unitSystem = UnitSystem.imperial.rawValue
+    @AppStorage(AppSettingsKeys.healthKitNutritionWrite) private var healthKitNutritionWrite = false
+    @AppStorage(AppSettingsKeys.healthKitWeightWrite) private var healthKitWeightWrite = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -98,7 +100,10 @@ struct ContentView: View {
     }
 
     private var settingsTab: some View {
-        SettingsView(appTabPadding: tabContentPadding)
+        SettingsView(
+            appTabPadding: tabContentPadding,
+            onImportAppleHealthWeights: importWeightsFromHealth
+        )
             .toolbarBackground(AppTheme.background, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
             .toolbarColorScheme(AppTheme.preferredColorScheme, for: .tabBar)
@@ -120,9 +125,15 @@ struct ContentView: View {
     }
 
     private func deleteEntry(id: UUID) {
+        let deletedEntry = entries.first { $0.id == id }
+
         withAnimation(AppTheme.Motion.delete(reduceMotion: reduceMotion)) {
             entries.removeAll { $0.id == id }
             FoodLogStore.save(entries)
+        }
+
+        if let deletedEntry {
+            deleteFoodFromHealthIfNeeded(deletedEntry)
         }
     }
 
@@ -146,6 +157,7 @@ struct ContentView: View {
             }
 
             FoodLogStore.save(entries)
+            syncFoodToHealthIfNeeded(entry)
             selectedDate = entry.loggedAt
             editingFoodEntry = nil
             selectedTab = .dashboard
@@ -156,6 +168,7 @@ struct ContentView: View {
         withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
             weightEntries.append(entry)
             WeightLogStore.save(weightEntries)
+            syncWeightToHealthIfNeeded(entry)
             selectedDate = entry.loggedAt
             selectedTab = .dashboard
         }
@@ -170,15 +183,96 @@ struct ContentView: View {
             }
 
             WeightLogStore.save(weightEntries)
+            syncWeightToHealthIfNeeded(entry)
             selectedDate = entry.loggedAt
         }
     }
 
     private func deleteWeightEntry(id: UUID) {
+        let deletedEntry = weightEntries.first { $0.id == id }
+
         withAnimation(AppTheme.Motion.delete(reduceMotion: reduceMotion)) {
             weightEntries.removeAll { $0.id == id }
             WeightLogStore.save(weightEntries)
         }
+
+        if let deletedEntry {
+            deleteWeightFromHealthIfNeeded(deletedEntry)
+        }
+    }
+
+    private func syncFoodToHealthIfNeeded(_ entry: FoodLogEntry) {
+        guard healthKitNutritionWrite else { return }
+
+        Task {
+            await HealthKitSyncService.saveFood(entry)
+        }
+    }
+
+    private func syncWeightToHealthIfNeeded(_ entry: WeightLogEntry) {
+        guard healthKitWeightWrite, entry.reference.source == .manual else { return }
+
+        Task {
+            await HealthKitSyncService.saveWeight(entry)
+        }
+    }
+
+    private func deleteFoodFromHealthIfNeeded(_ entry: FoodLogEntry) {
+        guard healthKitNutritionWrite else { return }
+
+        Task {
+            await HealthKitSyncService.deleteFood(entry)
+        }
+    }
+
+    private func deleteWeightFromHealthIfNeeded(_ entry: WeightLogEntry) {
+        guard healthKitWeightWrite, entry.reference.source == .manual else { return }
+
+        Task {
+            await HealthKitSyncService.deleteWeight(entry)
+        }
+    }
+
+    private func importWeightsFromHealth() async throws -> HealthKitWeightImportResult {
+        let endDate = Date.now
+        let startDate = Calendar.current.date(
+            byAdding: .year,
+            value: -5,
+            to: endDate
+        ) ?? .distantPast
+
+        let importedEntries = try await HealthKitSyncService.importWeights(
+            startDate: startDate,
+            endDate: endDate
+        )
+
+        var inserted = 0
+        var updated = 0
+
+        withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
+            for importedEntry in importedEntries {
+                if let index = weightEntries.firstIndex(where: { existingEntry in
+                    existingEntry.reference.source == .appleHealth &&
+                    existingEntry.reference.externalID == importedEntry.reference.externalID
+                }) {
+                    weightEntries[index] = importedEntry
+                    updated += 1
+                } else {
+                    weightEntries.append(importedEntry)
+                    inserted += 1
+                }
+            }
+
+            if inserted > 0 || updated > 0 {
+                WeightLogStore.save(weightEntries)
+            }
+        }
+
+        return HealthKitWeightImportResult(
+            scanned: importedEntries.count,
+            inserted: inserted,
+            updated: updated
+        )
     }
 
     private var dateState: DashboardDateState {

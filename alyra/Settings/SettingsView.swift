@@ -6,16 +6,26 @@ enum AppSettingsKeys {
     static let carbsTarget = "alyra.settings.carbsTarget"
     static let fatTarget = "alyra.settings.fatTarget"
     static let unitSystem = "alyra.settings.unitSystem"
+    static let healthKitNutritionWrite = "alyra.settings.healthKitNutritionSync"
+    static let healthKitWeightWrite = "alyra.settings.healthKitWeightSync"
 }
 
 struct SettingsView: View {
     let appTabPadding: CGFloat
+    var onImportAppleHealthWeights: () async throws -> HealthKitWeightImportResult = {
+        HealthKitWeightImportResult(scanned: 0, inserted: 0, updated: 0)
+    }
 
     @AppStorage(AppSettingsKeys.dailyCalories) private var dailyCalories = 2_200.0
     @AppStorage(AppSettingsKeys.proteinTarget) private var proteinTarget = 140.0
     @AppStorage(AppSettingsKeys.carbsTarget) private var carbsTarget = 250.0
     @AppStorage(AppSettingsKeys.fatTarget) private var fatTarget = 70.0
     @AppStorage(AppSettingsKeys.unitSystem) private var unitSystem = UnitSystem.imperial.rawValue
+    @AppStorage(AppSettingsKeys.healthKitNutritionWrite) private var healthKitNutritionWrite = false
+    @AppStorage(AppSettingsKeys.healthKitWeightWrite) private var healthKitWeightWrite = false
+    @State private var healthKitStatusMessage = HealthKitSyncService.availability.message
+    @State private var weightImportMessage = "Import body mass samples that Apple Health allows Alyra to read."
+    @State private var isImportingWeights = false
 
     var body: some View {
         ZStack {
@@ -73,6 +83,43 @@ struct SettingsView: View {
                     SettingsSection(title: "Preferences") {
                         UnitPickerRow(selection: $unitSystem)
                     }
+
+                    SettingsSection(title: "Apple Health") {
+                        HealthKitPermissionRow(
+                            statusMessage: healthKitStatusMessage,
+                            isAvailable: HealthKitSyncService.availability.isAvailable,
+                            action: requestHealthKitAuthorization
+                        )
+
+                        SettingsDivider()
+
+                        HealthKitSyncToggleRow(
+                            title: "Write food logs to Apple Health",
+                            detail: "Alyra will attempt to write calories, protein, carbs, fat, and fiber after Apple Health grants write access.",
+                            symbolName: "fork.knife",
+                            isOn: $healthKitNutritionWrite
+                        )
+
+                        SettingsDivider()
+
+                        HealthKitSyncToggleRow(
+                            title: "Write weight logs to Apple Health",
+                            detail: "Alyra will attempt to write manual weight logs after Apple Health grants write access.",
+                            symbolName: "scalemass",
+                            isOn: $healthKitWeightWrite
+                        )
+
+                        SettingsDivider()
+
+                        HealthKitImportRow(
+                            title: "Import Apple Health weight",
+                            detail: weightImportMessage,
+                            symbolName: "square.and.arrow.down",
+                            isImporting: isImportingWeights,
+                            isAvailable: HealthKitSyncService.availability.isAvailable,
+                            action: importAppleHealthWeights
+                        )
+                    }
                 }
                 .padding(AppTheme.Spacing.screen)
                 .padding(.top, 2)
@@ -81,6 +128,43 @@ struct SettingsView: View {
         }
         .foregroundStyle(AppTheme.primaryText)
         .tint(AppTheme.accent)
+    }
+
+    private func requestHealthKitAuthorization() {
+        Task {
+            do {
+                try await HealthKitSyncService.requestAuthorization(scopes: [.nutrition, .weight])
+                await MainActor.run {
+                    healthKitStatusMessage = "Authorization requested. Apple Health controls each permission separately."
+                }
+            } catch {
+                await MainActor.run {
+                    healthKitStatusMessage = "Authorization failed. Check Health permissions and app capability."
+                }
+            }
+        }
+    }
+
+    private func importAppleHealthWeights() {
+        guard !isImportingWeights else { return }
+
+        isImportingWeights = true
+
+        Task {
+            do {
+                let result = try await onImportAppleHealthWeights()
+
+                await MainActor.run {
+                    weightImportMessage = result.summary
+                    isImportingWeights = false
+                }
+            } catch {
+                await MainActor.run {
+                    weightImportMessage = "Import failed. Confirm read access in Apple Health, then try again."
+                    isImportingWeights = false
+                }
+            }
+        }
     }
 
     private var header: some View {
@@ -168,6 +252,127 @@ private struct UnitPickerRow: View {
                 }
             }
             .pickerStyle(.segmented)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+    }
+}
+
+private struct HealthKitPermissionRow: View {
+    let statusMessage: String
+    let isAvailable: Bool
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsValueLabel(
+                title: "Permissions",
+                value: isAvailable ? "Available" : "Unavailable",
+                symbolName: "heart.text.square"
+            )
+
+            Text(statusMessage)
+                .font(AppTheme.Typography.caption)
+                .foregroundStyle(AppTheme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(action: action) {
+                Text("Request Apple Health Access")
+                    .font(AppTheme.Typography.bodyStrong)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .foregroundStyle(AppTheme.background)
+                    .background(isAvailable ? AppTheme.primaryText : AppTheme.mutedText)
+                    .clipShape(
+                        RoundedRectangle(
+                            cornerRadius: AppTheme.Radius.control,
+                            style: .continuous
+                        )
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(!isAvailable)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+    }
+}
+
+private struct HealthKitSyncToggleRow: View {
+    let title: String
+    let detail: String
+    let symbolName: String
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbolName)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(AppTheme.secondaryText)
+                    .frame(width: 22)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(AppTheme.Typography.body)
+                        .foregroundStyle(AppTheme.primaryText)
+
+                    Text(detail)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+    }
+}
+
+private struct HealthKitImportRow: View {
+    let title: String
+    let detail: String
+    let symbolName: String
+    let isImporting: Bool
+    let isAvailable: Bool
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: symbolName)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(AppTheme.secondaryText)
+                    .frame(width: 22)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(AppTheme.Typography.body)
+                        .foregroundStyle(AppTheme.primaryText)
+
+                    Text(detail)
+                        .font(AppTheme.Typography.caption)
+                        .foregroundStyle(AppTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Button(action: action) {
+                Text(isImporting ? "Importing..." : "Import Weight Samples")
+                    .font(AppTheme.Typography.bodyStrong)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .foregroundStyle(AppTheme.primaryText)
+                    .overlay {
+                        RoundedRectangle(
+                            cornerRadius: AppTheme.Radius.control,
+                            style: .continuous
+                        )
+                        .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
+                    }
+            }
+            .buttonStyle(.plain)
+            .disabled(!isAvailable || isImporting)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 13)
