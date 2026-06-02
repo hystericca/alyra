@@ -465,21 +465,7 @@ private struct HealthGraphPanel: View {
                 .frame(height: density.chartHeight)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(density.padding)
-        .background(AppTheme.surfaceRaised)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: AppTheme.Radius.card,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: AppTheme.Radius.card,
-                style: .continuous
-            )
-            .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
-        }
+        .alyraPanel(padding: density.padding)
     }
 
     @ViewBuilder
@@ -705,27 +691,11 @@ private struct MealSectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: 12) {
-                Image(systemName: section.symbolName)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundStyle(AppTheme.mutedText)
-                    .frame(width: 31, alignment: .leading)
-
-                Text(section.title)
-                    .font(AppTheme.Typography.mealHeader)
-                    .foregroundStyle(AppTheme.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                Spacer()
-
-                Text(section.totalCaloriesText)
-                    .font(AppTheme.Typography.mealHeader)
-                    .foregroundStyle(AppTheme.mutedText)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
+            AlyraSectionTitle(
+                title: section.title,
+                symbolName: section.symbolName,
+                trailingText: section.totalCaloriesText
+            )
             .padding(.top, 6)
             .padding(.bottom, 16)
 
@@ -842,16 +812,5 @@ private struct FoodIcon: View {
             .font(.system(size: 15, weight: .medium))
             .foregroundStyle(AppTheme.dataAccent(kind.gradientKind))
             .frame(width: 22)
-    }
-}
-
-private struct AlyraSeparator: View {
-    var body: some View {
-        LinearGradient(
-            colors: [.clear, AppTheme.separator, AppTheme.separator, .clear],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-        .frame(height: AppTheme.Stroke.hairline)
     }
 }

@@ -158,21 +158,7 @@ private struct WeightHistoryGraphPanel: View {
             HealthGraphCanvas(graph: graph)
                 .frame(height: 142)
         }
-        .padding(14)
-        .background(AppTheme.surfaceRaised)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: AppTheme.Radius.card,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: AppTheme.Radius.card,
-                style: .continuous
-            )
-            .strokeBorder(AppTheme.strongBorder, lineWidth: AppTheme.Stroke.hairline)
-        }
+        .alyraPanel(border: .strong)
     }
 }
 

@@ -15,9 +15,16 @@ enum AppTheme {
     static let preferredColorScheme: ColorScheme = .dark
 
     enum Spacing {
-        static let screen: CGFloat = 18
-        static let section: CGFloat = 22
-        static let stack: CGFloat = 12
+        static let xxs: CGFloat = 4
+        static let xs: CGFloat = 6
+        static let sm: CGFloat = 10
+        static let md: CGFloat = 14
+        static let lg: CGFloat = 18
+        static let xl: CGFloat = 24
+
+        static let screen: CGFloat = lg
+        static let section: CGFloat = xl
+        static let stack: CGFloat = md
     }
 
     enum Radius {
@@ -31,15 +38,18 @@ enum AppTheme {
 
     enum Typography {
         private static let regular = "IBMPlexSans"
+        private static let medium = "IBMPlexSans-Medium"
         private static let semibold = "IBMPlexSans-SmBld"
 
         static let eyebrow = Font.custom(semibold, size: 11, relativeTo: .caption2)
         static let caption = Font.custom(regular, size: 12, relativeTo: .caption)
         static let body = Font.custom(regular, size: 15, relativeTo: .body)
-        static let bodyStrong = Font.custom(semibold, size: 15, relativeTo: .body)
-        static let sectionTitle = Font.custom(semibold, size: 17, relativeTo: .headline)
-        static let metric = Font.custom(semibold, size: 22, relativeTo: .title3)
-        static let mealHeader = Font.custom(semibold, size: 27, relativeTo: .title2)
+        static let bodyStrong = Font.custom(medium, size: 15, relativeTo: .body)
+        static let sectionTitle = Font.custom(medium, size: 17, relativeTo: .headline)
+        static let sectionHeader = Font.custom(medium, size: 26, relativeTo: .title2)
+        static let sectionIcon = Font.system(size: 23, weight: .medium)
+        static let metric = Font.custom(medium, size: 22, relativeTo: .title3)
+        static let mealHeader = sectionHeader
         static let header = Font.custom(semibold, size: 30, relativeTo: .largeTitle)
         static let gaugeNumber = Font.custom(semibold, size: 72, relativeTo: .largeTitle)
         static let gaugeUnit = Font.custom(regular, size: 12, relativeTo: .caption)

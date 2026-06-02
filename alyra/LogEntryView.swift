@@ -152,20 +152,7 @@ struct LogEntryView: View {
             }
         }
         .padding(4)
-        .background(AppTheme.surfaceRaised)
-        .clipShape(
-            RoundedRectangle(
-                cornerRadius: AppTheme.Radius.card,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: AppTheme.Radius.card,
-                style: .continuous
-            )
-            .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
-        }
+        .alyraPanel(padding: 0)
         .accessibilityLabel("Entry type")
     }
 
@@ -339,20 +326,7 @@ struct LogEntryView: View {
                     )
                 }
             }
-            .background(AppTheme.surfaceRaised)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Radius.card,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Radius.card,
-                    style: .continuous
-                )
-                .strokeBorder(AppTheme.strongBorder, lineWidth: AppTheme.Stroke.hairline)
-            }
+            .alyraPanel(padding: 0, border: .strong)
         }
     }
 
@@ -754,12 +728,6 @@ private struct MealTimePicker: View {
                 .accessibilityAddTraits(selection == meal ? [.isSelected] : [])
             }
         }
-    }
-}
-
-private extension View {
-    func alyraInputPanel() -> some View {
-        padding(.vertical, 4)
     }
 }
 

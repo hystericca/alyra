@@ -196,20 +196,7 @@ private struct SettingsSection<Content: View>: View {
             VStack(spacing: 0) {
                 content
             }
-            .background(AppTheme.surfaceRaised)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Radius.card,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: AppTheme.Radius.card,
-                    style: .continuous
-                )
-                .strokeBorder(AppTheme.border, lineWidth: AppTheme.Stroke.hairline)
-            }
+            .alyraPanel(padding: 0)
         }
     }
 }
