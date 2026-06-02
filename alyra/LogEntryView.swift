@@ -73,11 +73,13 @@ struct LogEntryView: View {
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+                VStack(alignment: .leading, spacing: LogEntryLayout.sectionSpacing) {
                     header
+
                     if editingFoodEntry == nil {
                         typePicker
                     }
+
                     timestampPicker
 
                     switch entryType {
@@ -116,7 +118,7 @@ struct LogEntryView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.xs) {
             Text(editingFoodEntry == nil ? "Log Entry" : "Edit Food")
                 .font(AppTheme.Typography.header)
                 .foregroundStyle(AppTheme.primaryText)
@@ -157,34 +159,29 @@ struct LogEntryView: View {
     }
 
     private var timestampPicker: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Logged at")
-                .font(AppTheme.Typography.eyebrow)
-                .foregroundStyle(AppTheme.mutedText)
-                .textCase(.uppercase)
-                .tracking(0.8)
+        LogFormSection(title: "Logged at", symbolName: "calendar.badge.clock") {
+            VStack(alignment: .leading, spacing: LogEntryLayout.fieldSpacing) {
+                DatePicker(
+                    selection: $loggedAt,
+                    displayedComponents: .date
+                ) {
+                    LogFieldLabel(title: "Date", symbolName: "calendar")
+                }
+                .font(AppTheme.Typography.body)
 
-            DatePicker(
-                selection: $loggedAt,
-                displayedComponents: .date
-            ) {
-                LogFieldLabel(title: "Date", symbolName: "calendar")
+                DatePicker(
+                    selection: $loggedAt,
+                    displayedComponents: .hourAndMinute
+                ) {
+                    LogFieldLabel(title: "Time", symbolName: "clock")
+                }
+                .font(AppTheme.Typography.body)
             }
-            .font(AppTheme.Typography.body)
-
-            DatePicker(
-                selection: $loggedAt,
-                displayedComponents: .hourAndMinute
-            ) {
-                LogFieldLabel(title: "Time", symbolName: "clock")
-            }
-            .font(AppTheme.Typography.body)
         }
-        .alyraInputPanel()
     }
 
     private var mealTimeSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: LogEntryLayout.tightSpacing) {
             LogFieldLabel(title: "Meal", symbolName: "fork.knife.circle")
 
             MealTimePicker(selection: $mealTime)
@@ -193,12 +190,12 @@ struct LogEntryView: View {
     }
 
     private var foodForm: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+        VStack(alignment: .leading, spacing: LogEntryLayout.sectionSpacing) {
             if editingFoodEntry == nil, !quickAddTemplates.isEmpty {
                 quickAddSection
             }
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: LogEntryLayout.fieldSpacing) {
                 LogTextField(
                     title: "Food",
                     symbolName: "fork.knife",
@@ -223,7 +220,7 @@ struct LogEntryView: View {
             }
             .alyraInputPanel()
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: LogEntryLayout.fieldSpacing) {
                 LogTextField(
                     title: "Serving",
                     symbolName: "scalemass",
@@ -246,7 +243,7 @@ struct LogEntryView: View {
                     suffix: "kcal"
                 )
 
-                HStack(spacing: 12) {
+                HStack(spacing: LogEntryLayout.columnSpacing) {
                     LogTextField(
                         title: "Protein",
                         symbolName: "dumbbell.fill",
@@ -270,7 +267,7 @@ struct LogEntryView: View {
                     )
                 }
 
-                HStack(spacing: 12) {
+                HStack(spacing: LogEntryLayout.columnSpacing) {
                     LogTextField(
                         title: "Fat",
                         symbolName: "drop.fill",
@@ -299,7 +296,7 @@ struct LogEntryView: View {
     }
 
     private var quickAddSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: LogEntryLayout.tightSpacing) {
             HStack(alignment: .firstTextBaseline) {
                 LogFieldLabel(title: "Quick add", symbolName: "clock.arrow.circlepath")
 
@@ -331,7 +328,7 @@ struct LogEntryView: View {
     }
 
     private var weightForm: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: LogEntryLayout.fieldSpacing) {
             LogTextField(
                 title: "Weight",
                 symbolName: "scalemass",
@@ -400,7 +397,7 @@ struct LogEntryView: View {
             Text(title)
                 .font(AppTheme.Typography.bodyStrong)
                 .frame(maxWidth: .infinity)
-                .frame(height: 50)
+                .frame(height: LogEntryLayout.saveButtonHeight)
                 .foregroundStyle(AppTheme.background)
                 .background(isEnabled ? AppTheme.primaryText : AppTheme.mutedText)
                 .clipShape(
@@ -528,6 +525,16 @@ struct LogEntryView: View {
     }
 }
 
+private enum LogEntryLayout {
+    static let sectionSpacing = AppTheme.Spacing.lg
+    static let fieldSpacing = AppTheme.Spacing.md
+    static let tightSpacing = AppTheme.Spacing.sm
+    static let columnSpacing = AppTheme.Spacing.md
+    static let fieldHeight = AppTheme.Control.fieldHeight
+    static let compactFieldHeight = AppTheme.Control.compactFieldHeight
+    static let saveButtonHeight: CGFloat = 50
+}
+
 private enum LogInputField: Hashable {
     case foodName
     case brand
@@ -582,7 +589,7 @@ private struct LogTextField: View {
                 }
             }
             .padding(.horizontal, 12)
-            .frame(height: 46)
+            .frame(height: LogEntryLayout.fieldHeight)
             .background(AppTheme.surfaceRaised)
             .clipShape(
                 RoundedRectangle(
@@ -609,10 +616,24 @@ private struct LogFieldLabel: View {
     var body: some View {
         Label(title, systemImage: symbolName)
             .font(AppTheme.Typography.eyebrow)
-            .foregroundStyle(AppTheme.primaryText)
+            .foregroundStyle(AppTheme.mutedText)
             .textCase(.uppercase)
             .tracking(0.8)
             .labelStyle(.titleAndIcon)
+    }
+}
+
+private struct LogFormSection<Content: View>: View {
+    let title: String
+    let symbolName: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: LogEntryLayout.tightSpacing) {
+            LogFieldLabel(title: title, symbolName: symbolName)
+            content
+        }
+        .alyraInputPanel()
     }
 }
 
@@ -632,7 +653,7 @@ private struct QuickAddFoodRow: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(template.foodName)
-                    .font(AppTheme.Typography.bodyStrong)
+                    .font(AppTheme.Typography.body)
                     .foregroundStyle(AppTheme.primaryText)
                     .lineLimit(1)
 
@@ -659,7 +680,7 @@ private struct QuickAddFoodRow: View {
                     .foregroundStyle(AppTheme.mutedText)
             }
             .padding(.horizontal, 9)
-            .frame(height: 38)
+            .frame(height: LogEntryLayout.compactFieldHeight)
             .background(AppTheme.background)
             .clipShape(
                 RoundedRectangle(

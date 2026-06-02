@@ -114,6 +114,8 @@ enum AppTheme {
 
     enum Control {
         static let minimumHitSize: CGFloat = 44
+        static let fieldHeight: CGFloat = 48
+        static let compactFieldHeight: CGFloat = 38
     }
 
     static let background = Color(light: 0xFFFFFF, dark: 0x000000)

@@ -13,19 +13,13 @@ struct FoodIconSelectorView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: selection.symbolName)
-                        .font(.system(size: 18, weight: .medium))
+                        .font(.system(size: 17, weight: .medium))
                         .symbolRenderingMode(.monochrome)
-                        .frame(width: 26)
+                        .frame(width: 24)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(selection.title)
-                            .font(AppTheme.Typography.bodyStrong)
-                            .foregroundStyle(AppTheme.primaryText)
-
-                        Text("Change food icon")
-                            .font(AppTheme.Typography.caption)
-                            .foregroundStyle(AppTheme.mutedText)
-                    }
+                    Text(selection.title)
+                        .font(AppTheme.Typography.body)
+                        .foregroundStyle(AppTheme.primaryText)
 
                     Spacer()
 
@@ -35,7 +29,7 @@ struct FoodIconSelectorView: View {
                 }
                 .foregroundStyle(AppTheme.primaryText)
                 .padding(.horizontal, 12)
-                .frame(height: 54)
+                .frame(height: AppTheme.Control.fieldHeight)
                 .background(AppTheme.surfaceRaised)
                 .clipShape(
                     RoundedRectangle(
@@ -158,7 +152,7 @@ private struct FoodIconSelectorLabel: View {
     var body: some View {
         Label(title, systemImage: symbolName)
             .font(AppTheme.Typography.eyebrow)
-            .foregroundStyle(AppTheme.primaryText)
+            .foregroundStyle(AppTheme.mutedText)
             .textCase(.uppercase)
             .tracking(0.8)
             .labelStyle(.titleAndIcon)

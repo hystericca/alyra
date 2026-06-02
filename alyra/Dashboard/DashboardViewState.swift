@@ -136,8 +136,8 @@ nonisolated struct MacroTileViewState: Identifiable, Equatable, Sendable {
         gradientKind = kind.gradientKind
         symbolName = kind.symbolName
         progress = DashboardNumberText.progress(value: value, target: target)
-        valueText = "\(DashboardNumberText.wholeNumber(value)) g"
-        targetText = "\(DashboardNumberText.wholeNumber(target)) g"
+        valueText = "\(DashboardNumberText.wholeNumber(value))g"
+        targetText = "\(DashboardNumberText.wholeNumber(target))g"
     }
 }
 
@@ -172,7 +172,7 @@ nonisolated struct LogEntryViewState: Identifiable, Equatable, Sendable {
         id = entry.id
         foodName = entry.foodName
         let timeText = entry.loggedAt.formatted(Date.FormatStyle.dateTime.hour().minute())
-        let servingText = "\(DashboardNumberText.wholeNumber(entry.servingGrams)) g"
+        let servingText = "\(DashboardNumberText.wholeNumber(entry.servingGrams))g"
         let foodDetailText = entry.brand.isEmpty ? servingText : "\(servingText) - \(entry.brand)"
         detailText = "\(timeText) - \(foodDetailText)"
         iconKind = entry.iconKind
