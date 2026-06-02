@@ -498,6 +498,7 @@ nonisolated struct WeightLogEntry: Codable, Identifiable, Equatable, Sendable {
     var loggedAt: Date
     var weightKilograms: Double
     var note: String
+    var reference: WeightLogReference
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -505,18 +506,21 @@ nonisolated struct WeightLogEntry: Codable, Identifiable, Equatable, Sendable {
         case weightKilograms
         case weightPounds
         case note
+        case reference
     }
 
     init(
         id: UUID,
         loggedAt: Date,
         weightKilograms: Double,
-        note: String
+        note: String,
+        reference: WeightLogReference = .manual
     ) {
         self.id = id
         self.loggedAt = loggedAt
         self.weightKilograms = weightKilograms
         self.note = note
+        self.reference = reference
     }
 
     init(
@@ -524,7 +528,8 @@ nonisolated struct WeightLogEntry: Codable, Identifiable, Equatable, Sendable {
         loggedAt: Date,
         displayWeight: Double,
         unitSystem: UnitSystem,
-        note: String
+        note: String,
+        reference: WeightLogReference = .manual
     ) {
         let measurement = Measurement(
             value: displayWeight,
@@ -535,7 +540,8 @@ nonisolated struct WeightLogEntry: Codable, Identifiable, Equatable, Sendable {
             id: id,
             loggedAt: loggedAt,
             weightKilograms: measurement.value,
-            note: note
+            note: note,
+            reference: reference
         )
     }
 
@@ -553,6 +559,7 @@ nonisolated struct WeightLogEntry: Codable, Identifiable, Equatable, Sendable {
         id = try container.decode(UUID.self, forKey: .id)
         loggedAt = try container.decode(Date.self, forKey: .loggedAt)
         note = try container.decodeIfPresent(String.self, forKey: .note) ?? ""
+        reference = try container.decodeIfPresent(WeightLogReference.self, forKey: .reference) ?? .manual
 
         if let weightKilograms = try container.decodeIfPresent(
             Double.self,
@@ -576,6 +583,23 @@ nonisolated struct WeightLogEntry: Codable, Identifiable, Equatable, Sendable {
         try container.encode(loggedAt, forKey: .loggedAt)
         try container.encode(weightKilograms, forKey: .weightKilograms)
         try container.encode(note, forKey: .note)
+        try container.encode(reference, forKey: .reference)
+    }
+}
+
+nonisolated enum WeightDataSource: String, Codable, Sendable {
+    case manual
+    case appleHealth
+}
+
+nonisolated struct WeightLogReference: Codable, Equatable, Sendable {
+    var source: WeightDataSource
+    var externalID: String?
+
+    static let manual = WeightLogReference(source: .manual, externalID: nil)
+
+    static func appleHealth(sampleID: String) -> WeightLogReference {
+        WeightLogReference(source: .appleHealth, externalID: sampleID)
     }
 }
 

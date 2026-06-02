@@ -7,6 +7,26 @@
 
 import Foundation
 
+nonisolated enum TrendPeriod: Int, CaseIterable, Identifiable, Sendable {
+    case twoWeeks = 14
+    case month = 30
+    case quarter = 90
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .twoWeeks: "14d"
+        case .month: "30d"
+        case .quarter: "90d"
+        }
+    }
+
+    var averageText: String {
+        "\(title) avg"
+    }
+}
+
 nonisolated struct DashboardDateState: Equatable, Sendable {
     private static let weekdayStyle = Date.FormatStyle.dateTime.weekday(.wide)
     private static let dateStyle = Date.FormatStyle.dateTime.month(.wide).day().year()
@@ -198,11 +218,12 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
         targets: DailyTargets,
         weightEntries: [WeightLogEntry],
         unitSystem: UnitSystem,
+        trendPeriod: TrendPeriod,
         through date: Date,
         calendar: Calendar = .current
     ) -> DashboardAnalyticsViewState {
         var analytics = DashboardAnalyticsViewState.empty(unitSystem: unitSystem)
-        let dayStarts = Self.dayStarts(endingAt: date, calendar: calendar)
+        let dayStarts = Self.dayStarts(endingAt: date, count: trendPeriod.rawValue, calendar: calendar)
         let dailyCalories = Self.dailyCalories(
             from: foodEntries,
             dayStarts: dayStarts,
@@ -218,7 +239,7 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
                 symbolName: "fork.knife",
                 valueText: DashboardNumberText.wholeNumber(latestCalories),
                 unitText: "kcal",
-                detailText: "\(DashboardNumberText.wholeNumber(averageCalories)) kcal 14d avg",
+                detailText: "\(DashboardNumberText.wholeNumber(averageCalories)) kcal \(trendPeriod.averageText)",
                 style: .bars,
                 gradientKind: .expenditure,
                 negativeGradientKind: nil,
@@ -235,7 +256,7 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
                 symbolName: "plus.forwardslash.minus",
                 valueText: DashboardNumberText.signedWholeNumber(latestBalance),
                 unitText: "kcal",
-                detailText: "\(DashboardNumberText.signedWholeNumber(averageBalance)) kcal 14d avg",
+                detailText: "\(DashboardNumberText.signedWholeNumber(averageBalance)) kcal \(trendPeriod.averageText)",
                 style: .bars,
                 gradientKind: .balancePositive,
                 negativeGradientKind: .balanceNegative,
@@ -245,7 +266,15 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
         }
 
         let sortedWeightEntries = weightEntries.sorted { $0.loggedAt < $1.loggedAt }
-        let recentWeightEntries = Array(sortedWeightEntries.suffix(14))
+        let startDate = calendar.date(
+            byAdding: .day,
+            value: -trendPeriod.rawValue + 1,
+            to: calendar.startOfDay(for: date)
+        ) ?? date
+        let recentWeightEntries = sortedWeightEntries.filter { entry in
+            entry.loggedAt >= startDate
+                && (entry.loggedAt <= date || calendar.isDate(entry.loggedAt, inSameDayAs: date))
+        }
         let weights = recentWeightEntries.map { $0.displayWeight(for: unitSystem) }
 
         if let latestWeight = weights.last {
@@ -262,7 +291,7 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
                 style: .lineArea,
                 gradientKind: .weight,
                 negativeGradientKind: nil,
-                values: weights
+                values: Self.movingAverage(values: weights)
             )
         }
 
@@ -271,14 +300,15 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
 
     private static func dayStarts(
         endingAt date: Date,
+        count: Int,
         calendar: Calendar
     ) -> [Date] {
         let endOfRange = calendar.startOfDay(for: date)
 
-        return (0..<14).compactMap { offset in
+        return (0..<count).compactMap { offset in
             calendar.date(
                 byAdding: .day,
-                value: offset - 13,
+                value: offset - count + 1,
                 to: endOfRange
             )
         }
@@ -293,6 +323,14 @@ nonisolated struct DashboardAnalyticsViewState: Equatable, Sendable {
             entries
                 .filter { calendar.isDate($0.loggedAt, inSameDayAs: dayStart) }
                 .reduce(0) { $0 + $1.nutrients.calories }
+        }
+    }
+
+    static func movingAverage(values: [Double], window: Int = 3) -> [Double] {
+        values.indices.map { index in
+            let lowerBound = max(0, index - window + 1)
+            let slice = values[lowerBound...index]
+            return slice.reduce(0, +) / Double(slice.count)
         }
     }
 }

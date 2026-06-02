@@ -15,6 +15,8 @@ struct ContentView: View {
     @State private var dateNavigationDirection = DateNavigationDirection.forward
     @State private var entries = FoodLogStore.load()
     @State private var weightEntries = WeightLogStore.load()
+    @State private var trendPeriod = TrendPeriod.twoWeeks
+    @State private var isWeightHistoryPresented = false
     @State private var editingFoodEntry: FoodLogEntry?
     @AppStorage(AppSettingsKeys.dailyCalories) private var dailyCalories = 2_200.0
     @AppStorage(AppSettingsKeys.proteinTarget) private var proteinTarget = 140.0
@@ -51,16 +53,30 @@ struct ContentView: View {
     }
 
     private var dashboardTab: some View {
-        DashboardView(
-            date: dateState,
-            dateNavigationDirection: dateNavigationDirection,
-            snapshot: dashboard,
-            appTabPadding: tabContentPadding,
-            onPreviousDay: { moveDate(by: -1) },
-            onNextDay: { moveDate(by: 1) },
-            onEdit: editEntry,
-            onDelete: deleteEntry
-        )
+        NavigationStack {
+            DashboardView(
+                date: dateState,
+                dateNavigationDirection: dateNavigationDirection,
+                snapshot: dashboard,
+                appTabPadding: tabContentPadding,
+                trendPeriod: $trendPeriod,
+                onPreviousDay: { moveDate(by: -1) },
+                onNextDay: { moveDate(by: 1) },
+                onEdit: editEntry,
+                onDelete: deleteEntry,
+                onWeightTrendSelected: { isWeightHistoryPresented = true }
+            )
+            .navigationDestination(isPresented: $isWeightHistoryPresented) {
+                WeightHistoryView(
+                    entries: weightEntriesForTrend,
+                    unitSystem: selectedUnitSystem,
+                    trendPeriod: $trendPeriod,
+                    through: selectedDate,
+                    onSave: saveWeightEntry,
+                    onDelete: deleteWeightEntry
+                )
+            }
+        }
         .toolbarBackground(AppTheme.background, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .toolbarColorScheme(AppTheme.preferredColorScheme, for: .tabBar)
@@ -145,6 +161,26 @@ struct ContentView: View {
         }
     }
 
+    private func saveWeightEntry(_ entry: WeightLogEntry) {
+        withAnimation(AppTheme.Motion.contentChange(reduceMotion: reduceMotion)) {
+            if let index = weightEntries.firstIndex(where: { $0.id == entry.id }) {
+                weightEntries[index] = entry
+            } else {
+                weightEntries.append(entry)
+            }
+
+            WeightLogStore.save(weightEntries)
+            selectedDate = entry.loggedAt
+        }
+    }
+
+    private func deleteWeightEntry(id: UUID) {
+        withAnimation(AppTheme.Motion.delete(reduceMotion: reduceMotion)) {
+            weightEntries.removeAll { $0.id == id }
+            WeightLogStore.save(weightEntries)
+        }
+    }
+
     private var dateState: DashboardDateState {
         DashboardDateState.from(selectedDate)
     }
@@ -162,6 +198,7 @@ struct ContentView: View {
                 targets: targets,
                 weightEntries: weightEntriesForTrend,
                 unitSystem: selectedUnitSystem,
+                trendPeriod: trendPeriod,
                 through: selectedDate
             )
         )

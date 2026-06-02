@@ -25,10 +25,12 @@ struct DashboardView: View {
     let dateNavigationDirection: DateNavigationDirection
     let snapshot: DashboardSnapshot
     let appTabPadding: CGFloat
+    @Binding var trendPeriod: TrendPeriod
     let onPreviousDay: () -> Void
     let onNextDay: () -> Void
     let onEdit: (UUID) -> Void
     let onDelete: (UUID) -> Void
+    let onWeightTrendSelected: () -> Void
 
     var body: some View {
         ZStack {
@@ -46,7 +48,11 @@ struct DashboardView: View {
 
                     EnergyMeter(state: snapshot.calories)
                     MacroStrip(macros: snapshot.macros)
-                    AnalyticsSection(analytics: snapshot.analytics)
+                    AnalyticsSection(
+                        analytics: snapshot.analytics,
+                        trendPeriod: $trendPeriod,
+                        onWeightTrendSelected: onWeightTrendSelected
+                    )
 
                     ForEach(snapshot.sections) { section in
                         MealSectionView(
@@ -369,23 +375,34 @@ private struct AnalyticsSection: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let analytics: DashboardAnalyticsViewState
+    @Binding var trendPeriod: TrendPeriod
+    let onWeightTrendSelected: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Trends")
-                    .font(AppTheme.Typography.sectionTitle)
+                    .font(AppTheme.Typography.mealHeader)
                     .foregroundStyle(AppTheme.primaryText)
 
                 Spacer()
 
-                Text("14d")
-                    .font(AppTheme.Typography.eyebrow)
-                    .foregroundStyle(AppTheme.mutedText)
-                    .monospacedDigit()
+                Picker("Trend period", selection: $trendPeriod) {
+                    ForEach(TrendPeriod.allCases) { period in
+                        Text(period.title)
+                            .tag(period)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 154)
             }
 
-            HealthGraphPanel(graph: analytics.weightTrend, density: .wide)
+            Button(action: onWeightTrendSelected) {
+                HealthGraphPanel(graph: analytics.weightTrend, density: .wide)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open weight history")
+            .accessibilityHint("Shows weight logs and trend charts")
 
             HStack(alignment: .top, spacing: 10) {
                 HealthGraphPanel(graph: analytics.expenditure, density: .compact)
@@ -529,7 +546,7 @@ private struct HealthGraphPanel: View {
     }
 }
 
-private struct HealthGraphCanvas: View {
+struct HealthGraphCanvas: View {
     let graph: HealthGraphViewState
 
     var body: some View {
